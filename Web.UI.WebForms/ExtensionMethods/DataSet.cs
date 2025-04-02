@@ -47,10 +47,6 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
         public static void SetFarCommands(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.FarCommands, value);
         public static string MoreCommands(this System.Data.DataSet ds) => (string)ds.GetParam(Table1Column.MoreCommands);
         public static void SetMoreCommands(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.MoreCommands, value);
-        public static string HiddenFields(this System.Data.DataSet ds) => (string)ds.GetParam(Table1Column.HiddenFields);
-        public static void SetHiddenFields(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.HiddenFields, value);
-        public static string ReadOnlyFields(this System.Data.DataSet ds) => (string)ds.GetParam(Table1Column.ReadonlyFields);
-        public static void SetReadOnlyFields(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.ReadonlyFields, value);
         public static string RequiredFields(this System.Data.DataSet ds) => (string)ds.GetParam(Table1Column.RequiredFields);
         public static void SetRequiredFields(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.RequiredFields, value);
 
@@ -101,8 +97,6 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             ds.CreateColumn<string>(Table1Column.Commands);
             ds.CreateColumn<string>(Table1Column.FarCommands);
             ds.CreateColumn<string>(Table1Column.MoreCommands);
-            ds.CreateColumn<string>(Table1Column.HiddenFields);
-            ds.CreateColumn<string>(Table1Column.ReadonlyFields);
             ds.CreateColumn<string>(Table1Column.RequiredFields);
         }
         public static DataTable Table1(this System.Data.DataSet ds) => ds.Tables[TableNames.Table1];
@@ -125,8 +119,10 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             {
                 var table = ds.Tables.Add(TableNames.Comments);
                 table.Columns.Add(CommentColumn.Type, typeof(string));
+                table.Columns.Add(CommentColumn.Role, typeof(string));
                 table.Columns.Add(CommentColumn.Author, typeof(string));
                 table.Columns.Add(CommentColumn.UserName, typeof(string));
+                table.Columns.Add(CommentColumn.Directory, typeof(string));
                 table.Columns.Add(new DataColumn(CommentColumn.Created, typeof(DateTime)) { DateTimeMode = DataSetDateTime.Utc });
                 table.Columns.Add(CommentColumn.ProcessInstanceId, typeof(int));
                 table.Columns.Add(CommentColumn.ProcessName, typeof(string));
@@ -173,16 +169,14 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             ds.SetParam(Table1Column.Commands, "", true);
             ds.SetParam(Table1Column.FarCommands, "", true);
             ds.SetParam(Table1Column.MoreCommands, "", true);
-            ds.SetParam(Table1Column.HiddenFields, "", true);
-            ds.SetParam(Table1Column.ReadonlyFields, "", true);
             ds.SetParam(Table1Column.RequiredFields, "", true);
             ds.SetConfigurationParam(ConfigurationColumn.AbsoluteUrl, absoluteUrl);
             ds.SetConfigurationParam(ConfigurationColumn.ProcessInstanceId, processInstanceId);
             ds.SetConfigurationParam(ConfigurationColumn.ActivityInstanceId, activityInstanceId);
-            ds.SetConfigurationParam(ConfigurationColumn.ServerVersion, FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion);
+            ds.SetConfigurationParam(ConfigurationColumn.ServerVersion, Assembly.GetExecutingAssembly().GetName().Version.ToString(3));
             ds.SetConfigurationParam(ConfigurationColumn.ClientVersion, clientVersion);
 
-            using (var db = new DataBaseContext(ConnectionStrings.MainDbSource))
+            using (var db = new DataBaseContext())
             using (var comm = db.Connection.CreateCommand())
             {
                 int assigneeId, assigneeRealId;
@@ -245,6 +239,7 @@ WHERE
             dt.Columns.Add(UserColumn.Locale, typeof(string));
             dt.Columns.Add(UserColumn.TimezoneId, typeof(int));
             dt.Columns.Add(UserColumn.Directory, typeof(string));
+            dt.Columns.Add(UserColumn.IsActive, typeof(bool));
             if (extendedAttributes != null)
             {
                 foreach (var extendedAttribute in extendedAttributes)
@@ -271,10 +266,12 @@ WHERE
         public static string ApprovalApproverEmployeeNumber(this DataRow row) => row.IsNull(ApprovalColumn.ApproverEmployeeNumber) ? null : (string)row[ApprovalColumn.ApproverEmployeeNumber];
         public static string ApprovalApproverEmail(this DataRow row) => row.IsNull(ApprovalColumn.ApproverEmail) ? null : (string)row[ApprovalColumn.ApproverEmail];
         public static string ApprovalApproverName(this DataRow row) => row.IsNull(ApprovalColumn.ApproverName) ? null : (string)row[ApprovalColumn.ApproverName];
+        public static string ApprovalApproverDirectory(this DataRow row) => row.IsNull(ApprovalColumn.ApproverDirectory) ? null : (string)row[ApprovalColumn.ApproverDirectory];
         public static string ApprovalApprovedByUserName(this DataRow row) => row.IsNull(ApprovalColumn.ApprovedByUserName) ? null : (string)row[ApprovalColumn.ApprovedByUserName];
         public static string ApprovalApprovedByEmployeeNumber(this DataRow row) => row.IsNull(ApprovalColumn.ApprovedByEmployeeNumber) ? null : (string)row[ApprovalColumn.ApprovedByEmployeeNumber];
         public static string ApprovalApprovedByEmail(this DataRow row) => row.IsNull(ApprovalColumn.ApprovedByEmail) ? null : (string)row[ApprovalColumn.ApprovedByEmail];
         public static string ApprovalApprovedByName(this DataRow row) => row.IsNull(ApprovalColumn.ApprovedByName) ? null : (string)row[ApprovalColumn.ApprovedByName];
+        public static string ApprovalApprovedByDirectory(this DataRow row) => row.IsNull(ApprovalColumn.ApprovedByDirectory) ? null : (string)row[ApprovalColumn.ApprovedByDirectory];
         public static string Approval(this DataRow row) => row.IsNull(ApprovalColumn.Approval) ? null : (string)row[ApprovalColumn.Approval];
         public static DateTime? ApprovalApproved(this DataRow row) => row.IsNull(ApprovalColumn.Approved) ? (DateTime?)null : (DateTime)row[ApprovalColumn.Approved];
         public static DataTable Approvals(this System.Data.DataSet ds) => ds.Tables[TableNames.Approvals];
@@ -295,20 +292,22 @@ WHERE
                 dt.Columns.Add(ApprovalColumn.ApproverEmployeeNumber, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApproverEmail, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApproverName, typeof(string));
+                dt.Columns.Add(ApprovalColumn.ApproverDirectory, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApprovedByUserName, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApprovedByEmployeeNumber, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApprovedByEmail, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApprovedByName, typeof(string));
+                dt.Columns.Add(ApprovalColumn.ApprovedByDirectory, typeof(string));
                 dt.Columns.Add(ApprovalColumn.Approval, typeof(string));
                 dt.Columns.Add(new DataColumn(ApprovalColumn.Approved, typeof(DateTime)) { DateTimeMode = DataSetDateTime.Utc });
             }
             dt.PrimaryKey = new DataColumn[] { dt.Columns[ApprovalColumn.Role] };
             return dt;
         }
-        public static void AddApprovalRow(this DataTable dt, string role, ApprovalType approval, DateTime approved, string approverUserName, string approverEmployeeNumber, string approverEmail, string approverName, string approvedByUserName, string approvedByEmployeeNumber, string approvedByEmail, string approvedByName, int processInstId, int activityInstId)
+        public static void AddApprovalRow(this DataTable dt, string role, ApprovalType approval, DateTime approved, string approverUserName, string approverEmployeeNumber, string approverEmail, string approverName, string approverDirectory, string approvedByUserName, string approvedByEmployeeNumber, string approvedByEmail, string approvedByName, string approvedByDirectory, int processInstId, int activityInstId)
         {
             var r = dt.AddApprovalRow(role);
-            r.SetApprovalRow(approval, approved, approverUserName, approverEmployeeNumber, approverEmail, approverName, approvedByUserName, approvedByEmployeeNumber, approvedByEmail, approvedByName, processInstId, activityInstId);
+            r.SetApprovalRow(approval, approved, approverUserName, approverEmployeeNumber, approverEmail, approverName, approverDirectory, approvedByUserName, approvedByEmployeeNumber, approvedByEmail, approvedByName, approvedByDirectory, processInstId, activityInstId);
         }
         public static DataRow AddApprovalRow(this DataTable dt, string role, bool needed = true)
         {
@@ -329,7 +328,7 @@ WHERE
             }
             return r;
         }
-        public static void SetApprovalRow(this DataRow r, ApprovalType approval, DateTime approved, string approverUserName, string approverEmployeeNumber, string approverEmail, string approverName, string approvedByUserName, string approvedByEmployeeNumber, string approvedByEmail, string approvedByName, int processInstId, int activityInstId, bool setApproverOnlyIfNull = false)
+        public static void SetApprovalRow(this DataRow r, ApprovalType approval, DateTime approved, string approverUserName, string approverEmployeeNumber, string approverEmail, string approverName, string approverDirectory, string approvedByUserName, string approvedByEmployeeNumber, string approvedByEmail, string approvedByName, string approvedByDirectory, int processInstId, int activityInstId, bool setApproverOnlyIfNull = false)
         {
             r[ApprovalColumn.Approval] = approval == ApprovalType.Rejected ? Model.Approval.Rejected : Model.Approval.Approved;
             r[ApprovalColumn.ProcessInstId] = processInstId;
@@ -339,10 +338,12 @@ WHERE
             r.SetParam(ApprovalColumn.ApproverEmployeeNumber, approverEmployeeNumber, setApproverOnlyIfNull);
             r.SetParam(ApprovalColumn.ApproverEmail, approverEmail, setApproverOnlyIfNull);
             r.SetParam(ApprovalColumn.ApproverName, approverName, setApproverOnlyIfNull);
+            r.SetParam(ApprovalColumn.ApproverDirectory, approverDirectory, setApproverOnlyIfNull);
             r[ApprovalColumn.ApprovedByUserName] = approvedByUserName;
             r[ApprovalColumn.ApprovedByEmployeeNumber] = approvedByEmployeeNumber;
             r[ApprovalColumn.ApprovedByEmail] = approvedByEmail;
             r[ApprovalColumn.ApprovedByName] = approvedByName;
+            r[ApprovalColumn.ApprovedByDirectory] = approvedByDirectory;
         }
         public static void ResetApprovalRow(this DataRow r, string approval = Model.Approval.Pending)
         {
@@ -354,9 +355,11 @@ WHERE
             r[ApprovalColumn.ApproverEmployeeNumber] =
             r[ApprovalColumn.ApproverEmail] =
             r[ApprovalColumn.ApproverName] =
+            r[ApprovalColumn.ApproverDirectory] =
             r[ApprovalColumn.ApprovedByUserName] =
             r[ApprovalColumn.ApprovedByEmployeeNumber] =
             r[ApprovalColumn.ApprovedByEmail] =
+            r[ApprovalColumn.ApprovedByDirectory] =
             r[ApprovalColumn.ApprovedByName] = DBNull.Value;
         }
         public static void AddUserRow(this DataTable dt, User user)
@@ -365,13 +368,15 @@ WHERE
             user.Set(newRow);
             dt.Rows.Add(newRow);
         }
-        public static void AddCommentRow(this System.Data.DataSet ds, string type, string author, string userName, DateTime created, int processInstanceId, string processName, int activityInstanceId, string activityName, string comment)
+        public static void AddCommentRow(this System.Data.DataSet ds, string type, string role, string author, string userName, string directory, DateTime created, int processInstanceId, string processName, int activityInstanceId, string activityName, string comment)
         {
             var dt = ds.Tables[TableNames.Comments];
             var newRow = dt.NewRow();
             newRow[CommentColumn.Type] = type;
+            newRow[CommentColumn.Role] = role == null ? DBNull.Value : (object)role;
             newRow[CommentColumn.Author] = author;
             newRow[CommentColumn.UserName] = userName;
+            newRow[CommentColumn.Directory] = directory;
             newRow[CommentColumn.Created] = created;
             newRow[CommentColumn.ProcessInstanceId] = processInstanceId;
             newRow[CommentColumn.ProcessName] = processName;
@@ -380,21 +385,21 @@ WHERE
             newRow[CommentColumn.Comment] = comment;
             dt.Rows.InsertAt(newRow, 0);
         }
-        public static object GetInitData(this System.Data.DataSet formData, string locale, TimeZoneInformation timezoneInfo)
+        public static object GetInitData(this System.Data.DataSet WfgDataSet, string Locale, TimeZoneInformation timezoneInfo)
         {
-            var utcOffset = timezoneInfo.NativeStructure.Bias + (timezoneInfo.IsDaylightSavingTime(DateTime.UtcNow) ? timezoneInfo.NativeStructure.DaylightBias : timezoneInfo.NativeStructure.StandardBias);
-            utcOffset = 0 - utcOffset;
+            var UTCOffset = timezoneInfo.NativeStructure.Bias + (timezoneInfo.IsDaylightSavingTime(DateTime.UtcNow) ? timezoneInfo.NativeStructure.DaylightBias : timezoneInfo.NativeStructure.StandardBias);
+            UTCOffset = 0 - UTCOffset;
             var settings = new JsonSerializerSettings();
             settings.DateTimeZoneHandling = DateTimeZoneHandling.Utc;
             return JsonConvert.SerializeObject(new
             {
-                locale,
-                timeZoneInfo = new
+                Locale,
+                TimeZoneInfo = new
                 {
-                    name = timezoneInfo.DisplayName,
-                    utcOffset
+                    Name = timezoneInfo.DisplayName,
+                    UTCOffset
                 },
-                formData
+                WfgDataSet
             }, settings);
         }
 

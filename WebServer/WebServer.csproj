@@ -4,11 +4,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{33F1D46D-E8D3-4BC9-AA76-052BD88F4DA9}</ProjectGuid>
+    <ProjectGuid>{6C87423A-052D-440C-A3B0-E7EA6AC8354E}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ParadimeWeb.WorkflowGen.Web.UI.WebForms</RootNamespace>
-    <AssemblyName>ParadimeWeb.WorkflowGen.Web.UI.WebForms</AssemblyName>
+    <RootNamespace>ParadimeWeb.WorkflowGen.WebServer</RootNamespace>
+    <AssemblyName>ParadimeWeb.WorkflowGen.WebServer</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -31,10 +31,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\WorkflowGen\8.3.4\Inetpub\wwwroot\wfgen\bin\Newtonsoft.Json.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
@@ -45,36 +41,12 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
-    <Reference Include="WorkflowGen.My">
-      <HintPath>..\..\..\..\WorkflowGen\8.3.4\Inetpub\wwwroot\wfgen\bin\WorkflowGen.My.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Data\ConnectionStrings.cs" />
-    <Compile Include="Data\DataBaseContext.cs" />
-    <Compile Include="Data\DataConnection.cs" />
-    <Compile Include="Data\ExtensionMethods.cs" />
-    <Compile Include="Data\GraphQL\ExtensionMethods.cs" />
-    <Compile Include="Data\GraphQL\MultipartFileUpload.cs" />
-    <Compile Include="Data\GraphQL\Variable.cs" />
-    <Compile Include="Data\JsonObject.cs" />
-    <Compile Include="Data\QueryResult.cs" />
-    <Compile Include="Data\SqlDataObject.cs" />
-    <Compile Include="ExtensionMethods\DataSet.cs" />
-    <Compile Include="Data\GraphQL\Client.cs" />
-    <Compile Include="Model\Approval.cs" />
-    <Compile Include="Model\ApprovalColumn.cs" />
-    <Compile Include="Model\CommentColumn.cs" />
-    <Compile Include="Model\ConfigurationColumn.cs" />
-    <Compile Include="Model\Table1Column.cs" />
-    <Compile Include="Model\TableNames.cs" />
-    <Compile Include="Model\User.cs" />
+    <Compile Include="Modules\Cookies.cs" />
+    <Compile Include="Modules\Hooks.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Data\Webhooks\Client.cs" />
-    <Compile Include="Utils.cs" />
-    <Compile Include="WorkflowPage.cs">
-      <SubType>ASPXCodeBehind</SubType>
-    </Compile>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

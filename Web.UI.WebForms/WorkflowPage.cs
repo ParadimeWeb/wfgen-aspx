@@ -126,10 +126,12 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
                     assignee.EmployeeNumber,
                     assignee.Email,
                     assignee.CommonName,
+                    assignee.Directory,
                     currentUser.UserName,
                     currentUser.EmployeeNumber,
                     currentUser.Email,
                     currentUser.CommonName,
+                    currentUser.Directory,
                     FormData.ProcessInstanceId(),
                     FormData.ActivityInstanceId(),
                     setApproverOnlyIfNull);
@@ -232,7 +234,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
                 var processInstId = Convert.ToInt32(Request.Form["ID_PROCESS_INST"]);
                 var activityInstId = Convert.ToInt32(Request.Form["ID_ACTIVITY_INST"]);
                 var delegatorId = Request.Form["ID_USER_DELEGATOR"];
-                using (var conn = new SqlConnection())
+                using (var conn = new SqlConnection(ConnectionStrings.MainDbSource))
                 using (var comm = conn.CreateCommand())
                 {
                     conn.Open();
@@ -282,7 +284,7 @@ WHERE
             if (wfgenAction == "ASYNC_FORM_ARCHIVE")
             {
                 IsFormArchive = true;
-                using (var conn = new SqlConnection())
+                using (var conn = new SqlConnection(ConnectionStrings.MainDbSource))
                 using (var comm = conn.CreateCommand())
                 {
                     conn.Open();
@@ -359,7 +361,7 @@ WHERE
                             Response.StatusDescription = "Internal Server Error";
                             Response.Write(JsonConvert.SerializeObject(new
                             {
-                                error = "errorWorkflowGenOutOfContext"
+                                error =  "errorWorkflowGenOutOfContext"
                             }));
                         });
                         return;
@@ -369,7 +371,7 @@ WHERE
 
                 using (var wfgenCtx = new ContextParameters(File.ReadAllText(contextPath)))
                 {
-                    using (var conn = new SqlConnection())
+                    using (var conn = new SqlConnection(ConnectionStrings.MainDbSource))
                     using (var cmd = conn.CreateCommand())
                     {
                         var instanceCreated = File.GetCreationTimeUtc(instancePath);
@@ -529,12 +531,10 @@ WHERE
         private List<string> setArchiveCommands(string _commands)
         {
             var commands = _commands.Split(',');
-            var custom = commands.FirstOrDefault(c => c == Command.Custom);
-            var approvals = commands.FirstOrDefault(c => c.StartsWith(Command.Approvals));
-            var comments = commands.FirstOrDefault(c => c.StartsWith(Command.Comments));
-            var print = commands.FirstOrDefault(c => c.StartsWith(Command.Print));
+            var approvals = commands.FirstOrDefault(c => c.StartsWith("APPROVALS"));
+            var comments = commands.FirstOrDefault(c => c.StartsWith("COMMENTS"));
+            var print = commands.FirstOrDefault(c => c.StartsWith("PRINT"));
             var archiveCommands = new List<string>();
-            if (custom != null) archiveCommands.Add(custom);
             if (approvals != null) archiveCommands.Add(approvals);
             if (comments != null) archiveCommands.Add(comments);
             if (print != null) archiveCommands.Add(print);
@@ -612,11 +612,11 @@ GROUP BY
                     while (r.NextResult());
                 }
                 var archiveCommands = setArchiveCommands(FormData.Commands());
-                archiveCommands.Insert(0, Command.Archive);
+                archiveCommands.Insert(0, "ARCHIVE");
                 FormData.SetCommands(string.Join(",", archiveCommands));
                 var archiveFarCommands = setArchiveCommands(FormData.FarCommands());
-                archiveFarCommands.Insert(0, Command.ArchiveCopyLink);
-                archiveFarCommands.Insert(0, Command.ArchiveDownload);
+                archiveFarCommands.Insert(0, "ARCHIVE_COPY_LINK");
+                archiveFarCommands.Insert(0, "ARCHIVE_DOWNLOAD");
                 FormData.SetFarCommands(string.Join(",", archiveFarCommands));
                 FormData.SetMoreCommands(string.Join(",", setArchiveCommands(FormData.MoreCommands())));
             }
@@ -687,11 +687,7 @@ GROUP BY
             allFields.Add("REJECT_COMMENTS");
             var separator = new char[] { ',', ';' };
             FormData.SetRequiredFields(string.Join(",", filterFields(allFields, FormData.RequiredFields().Split(separator, StringSplitOptions.RemoveEmptyEntries))));
-            FormData.SetReadOnlyFields(string.Join(",", filterFields(allFields, FormData.ReadOnlyFields().Split(separator, StringSplitOptions.RemoveEmptyEntries))));
-            allFields.Add("MENU");
-            allFields.Add("FOOTER");
-            FormData.SetHiddenFields(string.Join(",", filterFields(allFields, FormData.HiddenFields().Split(separator, StringSplitOptions.RemoveEmptyEntries))));
-
+ 
             FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
         }
         protected virtual void OnAsyncInit(string action, string data, ContextParameters ctx)
@@ -766,7 +762,7 @@ GROUP BY
             //
             // handle parameters
             //
-            using (var conn = new SqlConnection())
+            using (var conn = new SqlConnection(ConnectionStrings.MainDbSource))
             using (var cmd = conn.CreateCommand())
             {
                 conn.Open();
@@ -945,13 +941,13 @@ WHERE
                     string.IsNullOrEmpty(Request["ps"]) ? 20 : Convert.ToInt32(Request["ps"]))));
         protected virtual void OnAsyncGetUsers(string action, string data, ContextParameters ctx) =>
             Response.Write(JsonConvert.SerializeObject(Model.User.GetUsers(
-                Request["q"],
+                Request["query"],
                 Request["active"],
                 Request["archive"],
                 Request["dir"],
                 string.IsNullOrEmpty(Request["ea"]) ? new string[0] : Request["ea"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
-                string.IsNullOrEmpty(Request["p"]) ? 1 : Convert.ToInt32(Request["p"]),
-                string.IsNullOrEmpty(Request["ps"]) ? 20 : Convert.ToInt32(Request["ps"]))));
+                string.IsNullOrEmpty(Request["page"]) ? 1 : Convert.ToInt32(Request["page"]),
+                string.IsNullOrEmpty(Request["pageSize"]) ? 20 : Convert.ToInt32(Request["pageSize"]))));
         protected virtual void OnAsyncGetGroupUsers(string action, string data, ContextParameters ctx) =>
             Response.Write(JsonConvert.SerializeObject(Model.User.GetGroupUsers(
                 Request["n"],

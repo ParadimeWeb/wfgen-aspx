@@ -9,8 +9,10 @@
     public class CommentColumn
     {
         public const string Type = "Type";
+        public const string Role = "Role";
         public const string Author = "Author";
         public const string UserName = "UserName";
+        public const string Directory = "Directory";
         public const string Created = "Created";
         public const string ProcessInstanceId = "ProcessInstId";
         public const string ProcessName = "ProcessName";

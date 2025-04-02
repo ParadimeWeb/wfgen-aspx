@@ -36,6 +36,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms.Model
         public string Locale => (string)Values[UserColumn.Locale];
         public int TimezoneId => (int)Values[UserColumn.TimezoneId];
         public string Directory => (string)Values[UserColumn.Directory];
+        public bool IsActive => (bool)Values[UserColumn.IsActive];
 
         public User() { }
         public User(SerializationInfo info, StreamingContext context)
@@ -54,6 +55,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms.Model
             Values.Add(UserColumn.Locale, info.GetString(UserColumn.Locale));
             Values.Add(UserColumn.TimezoneId, info.GetString(UserColumn.TimezoneId));
             Values.Add(UserColumn.Directory, info.GetString(UserColumn.Directory));
+            Values.Add(UserColumn.IsActive, info.GetBoolean(UserColumn.IsActive));
         }
         public User(DataRow row)
         {
@@ -62,7 +64,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms.Model
                 Values.Add(col.ColumnName, row[col] == DBNull.Value ? null : row[col]);
             }
         }
-        public User(int id, string userName, string employeeNumber, string commonName, string firstName, string lastName, string email, string jobTitle, string locale, int timezoneId, string directory = null, params KeyValuePair<string, object>[] extendedAttributes)
+        public User(int id, string userName, string employeeNumber, string commonName, string firstName, string lastName, string email, string jobTitle, string locale, int timezoneId, string directory, bool isActive, params KeyValuePair<string, object>[] extendedAttributes)
         {
             Values.Add(UserColumn.Id, id);
             Values.Add(UserColumn.UserName, userName);
@@ -75,6 +77,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms.Model
             Values.Add(UserColumn.Locale, locale);
             Values.Add(UserColumn.TimezoneId, timezoneId);
             Values.Add(UserColumn.Directory, directory);
+            Values.Add(UserColumn.IsActive, isActive);
 
             if (extendedAttributes != null)
             {
@@ -102,6 +105,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms.Model
             addOrdinal("UP_ID_TIMEZONE_PREF");
             addOrdinal("ID_TIMEZONE");
             addOrdinal("DIRNAME");
+            addOrdinal("ACTIVE");
         }
         public override void Populate(SqlDataReader r, string source, string[] extraAttributes, Dictionary<string, int> ordinals, params object[] args)
         {
@@ -123,7 +127,8 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms.Model
             Values.Add(UserColumn.Locale, IsDBNull("UP_LANGUAGE_PREF") ? GetNullableString("LANGUAGE") : GetString("UP_LANGUAGE_PREF"));
             Values.Add(UserColumn.TimezoneId, IsDBNull("UP_ID_TIMEZONE_PREF") ? IsDBNull("ID_TIMEZONE") ? 0 : GetInt32("ID_TIMEZONE") : Convert.ToInt32(GetString("UP_ID_TIMEZONE_PREF")));
             Values.Add(UserColumn.Directory, GetString("DIRNAME"));
-            
+            Values.Add(UserColumn.IsActive, GetNullableString("ACTIVE") == "Y");
+
         }
         public void Set(DataRow row)
         {
