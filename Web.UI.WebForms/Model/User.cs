@@ -88,9 +88,9 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms.Model
             }
         }
 
-        public override void GetOrdinals(SqlDataReader sqlReader, string source, string[] extraAttributes, Dictionary<string, int> extraOrdinals)
+        public override void GetOrdinals(SqlDataReader sqlReader, string[] extraAttributes, Dictionary<string, int> extraOrdinals)
         {
-            base.GetOrdinals(sqlReader, source, extraAttributes, extraOrdinals);
+            base.GetOrdinals(sqlReader, extraAttributes, extraOrdinals);
 
             addOrdinal("ID_USER");
             addOrdinal("USERNAME");
@@ -107,9 +107,9 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms.Model
             addOrdinal("DIRNAME");
             addOrdinal("ACTIVE");
         }
-        public override void Populate(SqlDataReader r, string source, string[] extraAttributes, Dictionary<string, int> ordinals, params object[] args)
+        public override void Populate(SqlDataReader r, string[] extraAttributes, Dictionary<string, int> ordinals, params object[] args)
         {
-            base.Populate(r, source, extraAttributes, ordinals, args);
+            base.Populate(r, extraAttributes, ordinals, args);
 
             var firstName = GetNullableString("FIRSTNAME");
             Values.Add(UserColumn.FirstName, firstName);

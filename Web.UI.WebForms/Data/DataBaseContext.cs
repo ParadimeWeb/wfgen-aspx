@@ -8,7 +8,6 @@ namespace ParadimeWeb.WorkflowGen.Data
 {
     public class DataBaseContext : DataConnection
     {
-        public const string SOURCE = "WFGEN";
         private const string SELECT_USERPROFILES = @"
     u.*
     ,d.DIRNAME
@@ -47,7 +46,7 @@ WHERE
                     if (r.Read())
                     {
                         up = new T();
-                        up.GetOrdinalsAndPopulate(r, SOURCE, extraAttributes);
+                        up.GetOrdinalsAndPopulate(r, extraAttributes);
                     }
                 }
             }
@@ -75,7 +74,7 @@ WHERE
                     if (r.Read())
                     {
                         up = new T();
-                        up.GetOrdinalsAndPopulate(r, SOURCE, extraAttributes);
+                        up.GetOrdinalsAndPopulate(r, extraAttributes);
                     }
                 }
             }
@@ -92,10 +91,10 @@ WHERE
                 using (var r = comm.ExecuteReader())
                 {
                     var factory = new T();
-                    factory.GetOrdinals(r, SOURCE, extraAttributes, null);
+                    factory.GetOrdinals(r, extraAttributes, null);
                     while (r.Read())
                     {
-                        items.Add(factory.CreateInstance(r, SOURCE, extraAttributes));
+                        items.Add(factory.CreateInstance(r, extraAttributes));
                     }
                 }
             }
@@ -171,7 +170,7 @@ WHERE
     {(filters.Any() ? $"AND {string.Join(" AND ", filters)}" : string.Empty)}
 ";
                 comm.Parameters.AddWithValue("@query", q + "%");
-                results = comm.CreateQueryResult<T>(fromSql);
+                results = comm.CreateQueryResult<T>(fromSql, page, pageSize);
                 comm.CommandText = $@"SELECT {SELECT_USERPROFILES}{fromSql}
 ORDER BY
     LASTNAME, FIRSTNAME
@@ -181,10 +180,10 @@ FETCH NEXT {pageSize} ROWS ONLY
                 using (var r = comm.ExecuteReader())
                 {
                     var factory = new T();
-                    factory.GetOrdinals(r, SOURCE, extraAttributes, null);
+                    factory.GetOrdinals(r, extraAttributes, null);
                     while (r.Read())
                     {
-                        results.Rows.Add(factory.CreateInstance(r, SOURCE, extraAttributes));
+                        results.Rows.Add(factory.CreateInstance(r, extraAttributes));
                     }
                 }
             }
@@ -222,7 +221,7 @@ WHERE
 
                 comm.Parameters.AddWithValue("@name", name);
                 comm.Parameters.AddWithValue("@query", q + "%");
-                results = comm.CreateQueryResult<T>(fromSql);
+                results = comm.CreateQueryResult<T>(fromSql, page, pageSize);
 
                 comm.CommandText = $@"SELECT {SELECT_USERPROFILES}{fromSql}
 ORDER BY
@@ -233,10 +232,10 @@ FETCH NEXT {pageSize} ROWS ONLY
                 using (var r = comm.ExecuteReader())
                 {
                     var factory = new T();
-                    factory.GetOrdinals(r, SOURCE, extraAttributes, null);
+                    factory.GetOrdinals(r, extraAttributes, null);
                     while (r.Read())
                     {
-                        results.Rows.Add(factory.CreateInstance(r, SOURCE, extraAttributes));
+                        results.Rows.Add(factory.CreateInstance(r, extraAttributes));
                     }
                 }
             }
@@ -251,8 +250,10 @@ FETCH NEXT {pageSize} ROWS ONLY
             using (var comm = Connection.CreateCommand())
             {
                 EnsureConnectionIsOpen();
-                var filters = new List<string>();
-                filters.Add("NAME = @processName");
+                var filters = new List<string>
+                {
+                    "NAME = @processName"
+                };
                 comm.Parameters.AddWithValue("@processName", processName);
                 if (processVersion.HasValue)
                 {
@@ -293,7 +294,7 @@ WHERE
                     comm.Parameters.AddWithValue("@processId", processId);
                     comm.Parameters.AddWithValue("@name", name);
                     comm.Parameters.AddWithValue("@query", q + "%");
-                    results = comm.CreateQueryResult<T>(fromSql);
+                    results = comm.CreateQueryResult<T>(fromSql, page, pageSize);
 
                     comm.CommandText = $@"SELECT {SELECT_USERPROFILES}{fromSql}
 ORDER BY
@@ -304,10 +305,10 @@ FETCH NEXT {pageSize} ROWS ONLY
                     r = comm.ExecuteReader();
 
                     var factory = new T();
-                    factory.GetOrdinals(r, SOURCE, extraAttributes, null);
+                    factory.GetOrdinals(r, extraAttributes, null);
                     while (r.Read())
                     {
-                        results.Rows.Add(factory.CreateInstance(r, SOURCE, extraAttributes));
+                        results.Rows.Add(factory.CreateInstance(r, extraAttributes));
                     }
                     r.Close();
                 }
@@ -350,7 +351,7 @@ WHERE
                 comm.Parameters.AddWithValue("@processId", processId);
                 comm.Parameters.AddWithValue("@name", name);
                 comm.Parameters.AddWithValue("@query", q + "%");
-                results = comm.CreateQueryResult<T>(fromSql);
+                results = comm.CreateQueryResult<T>(fromSql, page, pageSize);
 
                 comm.CommandText = $@"SELECT {SELECT_USERPROFILES}{fromSql}
 ORDER BY
@@ -361,10 +362,10 @@ FETCH NEXT {pageSize} ROWS ONLY
                 using (var r = comm.ExecuteReader())
                 {
                     var factory = new T();
-                    factory.GetOrdinals(r, SOURCE, extraAttributes, null);
+                    factory.GetOrdinals(r, extraAttributes, null);
                     while (r.Read())
                     {
-                        results.Rows.Add(factory.CreateInstance(r, SOURCE, extraAttributes));
+                        results.Rows.Add(factory.CreateInstance(r, extraAttributes));
                     }
                 }
             }
@@ -701,7 +702,7 @@ ORDER BY
                 }
             }
 
-            return new QueryResult<Dictionary<string, object>>(rows.Skip(pageSize * (page - 1)).Take(pageSize).ToList(), total);
+            return new QueryResult<Dictionary<string, object>>(rows.Skip(pageSize * (page - 1)).Take(pageSize).ToList(), total, page, pageSize);
         }
         public byte[] GetFile(string processName, string name, int? processVersion = null)
         {

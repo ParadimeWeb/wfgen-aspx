@@ -9,34 +9,31 @@ namespace ParadimeWeb.WorkflowGen.Data
     {
         private Dictionary<string, int> ordinals = null;
         private SqlDataReader sqlReader = null;
-        public string Source { get; private set; }
 
-        public T CreateInstance(SqlDataReader sqlReader, string source, string[] extraAttributes = null, object[] args = null)
+        public T CreateInstance(SqlDataReader sqlReader, string[] extraAttributes = null, object[] args = null)
         {
             var t = new T();
-            t.Populate(sqlReader, source, extraAttributes, ordinals, args);
+            t.Populate(sqlReader, extraAttributes, ordinals, args);
             return t;
         }
 
-        public virtual void Populate(string key, string text, string source)
+        public virtual void Populate(string key, string text)
         {
-            Source = source;
             Values.Add("key", key);
             Values.Add("text", text);
         }
-        public void GetOrdinalsAndPopulate(SqlDataReader sqlReader, string source, string[] extraAttributes, Dictionary<string, int> extraOrdinals = null, params object[] args)
+        public void GetOrdinalsAndPopulate(SqlDataReader sqlReader, string[] extraAttributes, Dictionary<string, int> extraOrdinals = null, params object[] args)
         {
-            GetOrdinals(sqlReader, source, extraAttributes, extraOrdinals);
-            Populate(sqlReader, source, extraAttributes, ordinals, args);
+            GetOrdinals(sqlReader, extraAttributes, extraOrdinals);
+            Populate(sqlReader, extraAttributes, ordinals, args);
         }
-        public virtual void Populate(SqlDataReader sqlReader, string source, string[] extraAttributes, Dictionary<string, int> ordinals, params object[] args)
+        public virtual void Populate(SqlDataReader sqlReader, string[] extraAttributes, Dictionary<string, int> ordinals, params object[] args)
         {
             this.sqlReader = sqlReader;
             if (this.ordinals == null)
             {
                 this.ordinals = ordinals;
             }
-            Source = source;
             if (extraAttributes != null)
             {
                 foreach (var attribute in extraAttributes)
@@ -50,12 +47,11 @@ namespace ParadimeWeb.WorkflowGen.Data
             return ordinals;
         }
 
-        public virtual void GetOrdinals(SqlDataReader sqlReader, string source, string[] extraAttributes, Dictionary<string, int> extraOrdinals)
+        public virtual void GetOrdinals(SqlDataReader sqlReader, string[] extraAttributes, Dictionary<string, int> extraOrdinals)
         {
             if (ordinals == null)
             {
                 this.sqlReader = sqlReader;
-                Source = source;
                 ordinals = extraOrdinals == null ? new Dictionary<string, int>() : new Dictionary<string, int>(extraOrdinals);
                 if (extraAttributes != null)
                 {

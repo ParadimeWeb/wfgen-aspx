@@ -49,6 +49,8 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
         public static void SetMoreCommands(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.MoreCommands, value);
         public static string RequiredFields(this System.Data.DataSet ds) => (string)ds.GetParam(Table1Column.RequiredFields);
         public static void SetRequiredFields(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.RequiredFields, value);
+        public static string ReadonlyFields(this System.Data.DataSet ds) => (string)ds.GetParam(Table1Column.ReadonlyFields);
+        public static void SetReadonlyFields(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.ReadonlyFields, value);
 
         public static void CreateColumn<T>(this System.Data.DataSet ds, string tableName, string colName, object defaultValue = null)
         {
@@ -98,6 +100,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             ds.CreateColumn<string>(Table1Column.FarCommands);
             ds.CreateColumn<string>(Table1Column.MoreCommands);
             ds.CreateColumn<string>(Table1Column.RequiredFields);
+            ds.CreateColumn<string>(Table1Column.ReadonlyFields);
         }
         public static DataTable Table1(this System.Data.DataSet ds) => ds.Tables[TableNames.Table1];
         public static DataTable Comments(this System.Data.DataSet ds) => ds.Tables[TableNames.Comments];
@@ -170,6 +173,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             ds.SetParam(Table1Column.FarCommands, "", true);
             ds.SetParam(Table1Column.MoreCommands, "", true);
             ds.SetParam(Table1Column.RequiredFields, "", true);
+            ds.SetParam(Table1Column.ReadonlyFields, "", true);
             ds.SetConfigurationParam(ConfigurationColumn.AbsoluteUrl, absoluteUrl);
             ds.SetConfigurationParam(ConfigurationColumn.ProcessInstanceId, processInstanceId);
             ds.SetConfigurationParam(ConfigurationColumn.ActivityInstanceId, activityInstanceId);

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.SqlClient;
 using System.Data;
 using System.Globalization;
 using System.IO;
@@ -21,17 +20,17 @@ using WorkflowGen.My.Security;
 using ParadimeWeb.WorkflowGen.Data;
 using ParadimeWeb.WorkflowGen.Data.GraphQL;
 using Newtonsoft.Json.Linq;
+using System.Net;
 
 namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
 {
     public abstract class WorkflowPage : Page
     {
-        private bool saveOutput;
         private string wfgenAction;
-        private string wfgenData;
         private string replyToUrl;
         private string instancePath;
         private HttpCookie delegatorCookie;
+        protected DataBaseContext DbCtx {  get; private set; }
         protected bool IsAsyncRequest { get; private set; }
         protected bool IsWebhook { get; private set; }
         protected bool IsFormArchive { get; private set; }
@@ -46,8 +45,8 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
 
         public WorkflowPage()
         {
-            saveOutput = false;
             IsFormArchive = false;
+            DbCtx = new DataBaseContext();
         }
         protected void AddApproval(string role, bool needed = true)
         {
@@ -139,24 +138,27 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
         }
         protected void FillFormData()
         {
-            FormData.InitializeTable1();
-            FormData.ReadXml(instancePath);
-            dynamic jsonData = JsonConvert.DeserializeObject(wfgenData);
-            foreach (var table in jsonData)
+            using (var sw = new StreamReader(Request.Files["FormData"].InputStream, Encoding.UTF8))
             {
-                string tableName = table.Name;
-                var dt = FormData.Tables[tableName];
-                dt.Rows.Clear();
-                foreach (var row in table.Value)
+                FormData.InitializeTable1();
+                FormData.ReadXml(instancePath);
+                dynamic jsonData = JsonConvert.DeserializeObject(sw.ReadToEnd());
+                foreach (var table in jsonData)
                 {
-                    var newRow = dt.NewRow();
-                    foreach (var prop in row)
+                    string tableName = table.Name;
+                    var dt = FormData.Tables[tableName];
+                    dt.Rows.Clear();
+                    foreach (var row in table.Value)
                     {
-                        string column = prop.Name;
-                        object value = prop.Value.Value;
-                        newRow.SetParam(column, value);
+                        var newRow = dt.NewRow();
+                        foreach (var prop in row)
+                        {
+                            string column = prop.Name;
+                            object value = prop.Value.Value;
+                            newRow.SetParam(column, value);
+                        }
+                        dt.Rows.Add(newRow);
                     }
-                    dt.Rows.Add(newRow);
                 }
             }
         }
@@ -234,10 +236,9 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
                 var processInstId = Convert.ToInt32(Request.Form["ID_PROCESS_INST"]);
                 var activityInstId = Convert.ToInt32(Request.Form["ID_ACTIVITY_INST"]);
                 var delegatorId = Request.Form["ID_USER_DELEGATOR"];
-                using (var conn = new SqlConnection(ConnectionStrings.MainDbSource))
-                using (var comm = conn.CreateCommand())
+                using (var comm = DbCtx.Connection.CreateCommand())
                 {
-                    conn.Open();
+                    DbCtx.EnsureConnectionIsOpen();
                     comm.CommandText = @"SELECT 
     RD.ID_PROCESS,
     RD.ID_RELDATA,
@@ -284,10 +285,9 @@ WHERE
             if (wfgenAction == "ASYNC_FORM_ARCHIVE")
             {
                 IsFormArchive = true;
-                using (var conn = new SqlConnection(ConnectionStrings.MainDbSource))
-                using (var comm = conn.CreateCommand())
+                using (var comm = DbCtx.Connection.CreateCommand())
                 {
-                    conn.Open();
+                    DbCtx.EnsureConnectionIsOpen();
                     comm.CommandText = @"SELECT 
 	u.LANGUAGE,
 	u.ID_TIMEZONE,
@@ -371,11 +371,10 @@ WHERE
 
                 using (var wfgenCtx = new ContextParameters(File.ReadAllText(contextPath)))
                 {
-                    using (var conn = new SqlConnection(ConnectionStrings.MainDbSource))
-                    using (var cmd = conn.CreateCommand())
+                    using (var cmd = DbCtx.Connection.CreateCommand())
                     {
                         var instanceCreated = File.GetCreationTimeUtc(instancePath);
-                        conn.Open();
+                        DbCtx.EnsureConnectionIsOpen();
                         cmd.CommandText = "SELECT ID_STATE, DATE_START FROM WFACTIVITY_INST WHERE ID_PROCESS_INST = @ProcessInstanceId AND ID_ACTIVITY_INST = @ActivityInstanceId";
                         cmd.Parameters.AddWithValue("@ActivityInstanceId", wfgenCtx.ActivityInstanceId);
                         cmd.Parameters.AddWithValue("@ProcessInstanceId", wfgenCtx.ProcessInstanceId);
@@ -413,21 +412,21 @@ WHERE
 
                     CurrentWorkflowActionName = wfgenCtx.Contains("CURRENT_ACTION") ? (string)wfgenCtx["CURRENT_ACTION"].Value : "";
 
-                    wfgenData = Request.Form["__WFGENDATA"];
                     if (wfgenAction == "POST_DOWNLOAD")
                     {
-                        runAction(OnDownload, wfgenAction, wfgenData, wfgenCtx);
+                        runAction(OnDownload, wfgenAction, wfgenCtx);
                         return;
                     }
                     if (IsAsyncRequest)
                     {
-                        Action<string, string, ContextParameters> run;
-                        var actions = new Dictionary<string, Action<string, string, ContextParameters>>()
+                        Action<string, ContextParameters> run;
+                        var actions = new Dictionary<string, Action<string, ContextParameters>>()
                         {
                             { "ASYNC_INIT", OnAsyncInit },
                             { "ASYNC_UPLOAD", OnAsyncUpload },
                             { "ASYNC_SAVE", OnAsyncSave },
-                            { "ASYNC_ThrowException", (action, data, ctx) => throw new Exception("Runtime error in an AJAX call") },
+                            { "ASYNC_SUBMIT", OnAsyncSubmit },
+                            { "ASYNC_ThrowException", (action, ctx) => throw new Exception("Runtime error in an AJAX call") },
                             { "ASYNC_GetLocalProcessParticipantUsers", OnAsyncGetLocalProcessParticipantUsers },
                             { "ASYNC_GetUsers", OnAsyncGetUsers },
                             { "ASYNC_GetGroupUsers", OnAsyncGetGroupUsers },
@@ -438,14 +437,14 @@ WHERE
                         OnAsyncActions(actions);
                         if (!actions.TryGetValue(wfgenAction, out run))
                         {
-                            run = (string action, string data, ContextParameters ctx) =>
+                            run = (string action, ContextParameters ctx) =>
                             {
                                 Response.StatusCode = 501;
                                 Response.StatusDescription = "Not Implemented";
                                 Response.Write(JsonConvert.SerializeObject(new { error = "errorWorkflowGenActionNotImplemented", parameters = new string[] { action } }));
                             };
                         }
-                        runAction(run, wfgenAction, wfgenData, wfgenCtx);
+                        runAction(run, wfgenAction, wfgenCtx);
                     }
                 }
                 return;
@@ -453,8 +452,6 @@ WHERE
 
             if (!string.IsNullOrEmpty(Request.Form["WFGEN_REPLY_TO"]) && !string.IsNullOrEmpty(Request.Form["WFGEN_STORAGE_PATH"]) && !string.IsNullOrEmpty(Request.Form["WFGEN_INSTANCE_PATH"]))
             {
-                ClientScript.RegisterHiddenField("__WFGENACTION", "");
-                ClientScript.RegisterHiddenField("__WFGENDATA", "");
                 instancePath = CryptographyHelper.Decode(Request.Form["WFGEN_INSTANCE_PATH"], encryptionKey);
                 stateManager.Add("WFGEN_INSTANCE_PATH", instancePath);
                 StoragePath = CryptographyHelper.Decode(Request.Form["WFGEN_STORAGE_PATH"], encryptionKey);
@@ -481,34 +478,6 @@ WHERE
                 }
             }
         }
-        protected override void OnLoad(EventArgs e)
-        {
-            if (Page.IsPostBack)
-            {
-                FillFormData();
-                FormData.SetFormAction(wfgenAction);
-                FormData.SetFormArchiveFileName("form_archive.htm");
-                OnPreSubmit(wfgenAction);
-                FormData.SetConfigurationParam(ConfigurationColumn.Modified, DateTime.Now);
-                FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
-                saveOutput = true;
-            }
-            base.OnLoad(e);
-        }
-        protected override void Render(HtmlTextWriter writer)
-        {
-            if (saveOutput)
-            {
-                var htmlDocument = Utils.GetFormArchive(FormData.ProcessInstanceId(), FormData.ActivityInstanceId(), delegatorCookie?.Value, Utils.GetHtmlPath(Context), Request.Url);
-                htmlDocument.Save(Path.Combine(StoragePath, FormData.FormArchiveFileName()), Encoding.UTF8);
-                Response.Redirect(replyToUrl, false);
-                HttpContext.Current.ApplicationInstance.CompleteRequest();
-            }
-            else
-            {
-                base.Render(writer);
-            }
-        }
         public override void Dispose()
         {
             base.Dispose();
@@ -516,6 +485,7 @@ WHERE
             {
                 FormData.Dispose();
             }
+            DbCtx.Dispose();
         }
         protected virtual KeyValuePair<string, Type>[] OnGetUserExtendedAttributes()
         {
@@ -525,9 +495,8 @@ WHERE
         {
             return new string[0];
         }
-        protected virtual void OnPreSubmit(string action) { }
         protected virtual void OnWebhooks(Dictionary<string, Action<string>> hooks) { }
-        protected virtual void OnAsyncActions(Dictionary<string, Action<string, string, ContextParameters>> actions) { }
+        protected virtual void OnAsyncActions(Dictionary<string, Action<string, ContextParameters>> actions) { }
         private List<string> setArchiveCommands(string _commands)
         {
             var commands = _commands.Split(',');
@@ -626,7 +595,7 @@ GROUP BY
             OnPreAsyncFormArchive(processInstId, activityInstId, delegatorId, dataName);
             Response.Write(FormData.GetInitData(LangId, UserTimeZoneInfo));
         }
-        protected virtual void OnPreAsyncInit(string action, string data, ContextParameters ctx)
+        protected virtual void OnPreAsyncInit(string action, ContextParameters ctx)
         {
             var currentUserExtendedAttributes = OnGetUserExtendedAttributes();
             var allFields = FormData.Tables[TableNames.Table1].Columns.OfType<DataColumn>().Select(c => c.ColumnName).ToList();
@@ -636,7 +605,7 @@ GROUP BY
                 ctx.ProcessInstanceId,
                 ctx.ActivityInstanceId,
                 AbsoluteUrl,
-                data,
+                Request.Form["version"],
                 currentUserExtendedAttributes.Select(i => i.Key).ToArray());
             //
             // handle files
@@ -655,7 +624,11 @@ GROUP BY
                         Directory.CreateDirectory(fileDirectory);
                         File.Move(originalFilePath, Path.Combine(fileDirectory, fileCtx.Name));
                     }
-                    FormData.SetParam(fileParam.Name, Path.Combine("file", fileParam.Name, fileCtx.Name));
+                    var queryString = HttpUtility.ParseQueryString(string.Empty);
+                    queryString.Add("Key", fileParam.Name);
+                    queryString.Add("Path", Path.Combine("file", fileParam.Name, fileCtx.Name));
+                    queryString.Add("Name", fileCtx.Name);
+                    FormData.SetParam(fileParam.Name, queryString);
                 }
             }
 
@@ -690,14 +663,32 @@ GROUP BY
  
             FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
         }
-        protected virtual void OnAsyncInit(string action, string data, ContextParameters ctx)
+        protected virtual void OnAsyncInit(string action, ContextParameters ctx)
         {
-            OnPreAsyncInit(action, data, ctx);
+            OnPreAsyncInit(action, ctx);
             Response.Write(FormData.GetInitData(LangId, UserTimeZoneInfo));
         }
-        protected virtual void OnDownload(string action, string data, ContextParameters ctx)
+        protected virtual void OnPreSubmit(string action) { }
+        protected virtual void OnPreAsyncSubmit(string action, ContextParameters ctx)
         {
-            dynamic json = JsonConvert.DeserializeObject(data);
+            FillFormData();
+            FormData.SetFormAction(wfgenAction);
+            FormData.SetFormArchiveFileName("form_archive.htm");
+            OnPreSubmit(wfgenAction);
+            FormData.SetConfigurationParam(ConfigurationColumn.Modified, DateTime.Now);
+            FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
+            var htmlDocument = Utils.GetFormArchive(FormData.ProcessInstanceId(), FormData.ActivityInstanceId(), delegatorCookie?.Value, Utils.GetHtmlPath(Context), Request.Url);
+            htmlDocument.Save(Path.Combine(StoragePath, FormData.FormArchiveFileName()), Encoding.UTF8);
+        }
+        protected virtual void OnAsyncSubmit(string action, ContextParameters ctx)
+        {
+            OnPreAsyncSubmit(action, ctx);
+            Response.Write(JsonConvert.SerializeObject(new { replyTo = replyToUrl }));
+        }
+        protected virtual void OnDownload(string action, ContextParameters ctx)
+        {
+            //dynamic json = JsonConvert.DeserializeObject(data);
+            dynamic json = JsonConvert.DeserializeObject("");
             string filePath = json.f;
             string dispositionType = json.t;
             if (dispositionType != "attachment")
@@ -713,7 +704,7 @@ GROUP BY
             Response.AddHeader("Accept-Ranges", "bytes");
             Response.TransmitFile(filePath);
         }
-        protected virtual void OnPreAsyncUpload(string action, string data, ContextParameters ctx, out List<object> files)
+        protected virtual void OnPreAsyncUpload(string action, ContextParameters ctx, out List<object> files)
         {
             files = new List<object>();
             dynamic fileUploads = JsonConvert.DeserializeObject(Request["fileUploads"]);
@@ -738,14 +729,14 @@ GROUP BY
                 files.Add(fileUpload);
             }
         }
-        protected virtual void OnAsyncUpload(string action, string data, ContextParameters ctx)
+        protected virtual void OnAsyncUpload(string action, ContextParameters ctx)
         {
             List<object> files;
-            OnPreAsyncUpload(action, data, ctx, out files);
+            OnPreAsyncUpload(action, ctx, out files);
             Response.Write(JsonConvert.SerializeObject(files));
         }
         protected virtual void OnBeforeAsyncSave() { }
-        protected virtual void OnAsyncSave(string action, string data, ContextParameters ctx)
+        protected virtual void OnAsyncSave(string action, ContextParameters ctx)
         {
             FillFormData();
             FormData.SetFormArchiveFileName("form_archive.htm");
@@ -762,10 +753,9 @@ GROUP BY
             //
             // handle parameters
             //
-            using (var conn = new SqlConnection(ConnectionStrings.MainDbSource))
-            using (var cmd = conn.CreateCommand())
+            using (var cmd = DbCtx.Connection.CreateCommand())
             {
-                conn.Open();
+                DbCtx.EnsureConnectionIsOpen();
                 cmd.CommandText = @"SELECT 
 	[PARAM],
 	[NAME],
@@ -909,8 +899,6 @@ WHERE
                     cmd.Parameters.Clear();
                     cmd.ExecuteNonQuery();
                 }
-
-                conn.Close();
             }
 
             var query = $@"updateRequestDataset(input: {{ 
@@ -918,12 +906,20 @@ WHERE
     parameters: [{string.Join(", ", parameters)}] 
 }}) {{ clientMutationId }}";
 
-            Client.CreateClient(Client.DefaultUrl);
-            Client.Mutation(query, variables.ToArray());
+            Client.CreateClient(Client.DefaultUrl, new NetworkCredential("wfgen_admin", "WorkflowGen1!"));
+            try
+            {
+                Client.Mutation(query, variables.ToArray());
+            }
+            catch (Exception ex) 
+            {
+                throw new Exception($"{User.Identity.Name}", ex);
+            }
+            
 
             Response.Write("{ \"result\": \"Success\" }");
         }
-        protected virtual void OnAsyncGetLocalProcessParticipantUsers(string action, string data, ContextParameters ctx) =>
+        protected virtual void OnAsyncGetLocalProcessParticipantUsers(string action, ContextParameters ctx) =>
             Response.Write(JsonConvert.SerializeObject(Request["pid"] != null ?
                 Model.User.GetLocalProcessParticipantUsers(
                     Request["n"],
@@ -939,7 +935,7 @@ WHERE
                     string.IsNullOrEmpty(Request["ea"]) ? new string[0] : Request["ea"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
                     string.IsNullOrEmpty(Request["p"]) ? 1 : Convert.ToInt32(Request["p"]),
                     string.IsNullOrEmpty(Request["ps"]) ? 20 : Convert.ToInt32(Request["ps"]))));
-        protected virtual void OnAsyncGetUsers(string action, string data, ContextParameters ctx) =>
+        protected virtual void OnAsyncGetUsers(string action, ContextParameters ctx) =>
             Response.Write(JsonConvert.SerializeObject(Model.User.GetUsers(
                 Request["query"],
                 Request["active"],
@@ -948,7 +944,7 @@ WHERE
                 string.IsNullOrEmpty(Request["ea"]) ? new string[0] : Request["ea"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
                 string.IsNullOrEmpty(Request["page"]) ? 1 : Convert.ToInt32(Request["page"]),
                 string.IsNullOrEmpty(Request["pageSize"]) ? 20 : Convert.ToInt32(Request["pageSize"]))));
-        protected virtual void OnAsyncGetGroupUsers(string action, string data, ContextParameters ctx) =>
+        protected virtual void OnAsyncGetGroupUsers(string action, ContextParameters ctx) =>
             Response.Write(JsonConvert.SerializeObject(Model.User.GetGroupUsers(
                 Request["n"],
                 Request["q"],
@@ -958,11 +954,11 @@ WHERE
                 string.IsNullOrEmpty(Request["ea"]) ? new string[0] : Request["ea"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
                 string.IsNullOrEmpty(Request["p"]) ? 1 : Convert.ToInt32(Request["p"]),
                 string.IsNullOrEmpty(Request["ps"]) ? 20 : Convert.ToInt32(Request["ps"]))));
-        protected virtual void OnAsyncGetUser(string action, string data, ContextParameters ctx) =>
+        protected virtual void OnAsyncGetUser(string action, ContextParameters ctx) =>
             Response.Write(JsonConvert.SerializeObject(Model.User.GetUser(Request["u"], Request["id"], string.IsNullOrEmpty(Request["ea"]) ? new string[0] : Request["ea"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))));
-        protected virtual void OnAsyncGetManager(string action, string data, ContextParameters ctx) =>
+        protected virtual void OnAsyncGetManager(string action, ContextParameters ctx) =>
             Response.Write(JsonConvert.SerializeObject(Model.User.GetManager(Request["u"], string.IsNullOrEmpty(Request["ea"]) ? new string[0] : Request["ea"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))));
-        protected virtual void OnAsyncGetGlobalListItems(string action, string data, ContextParameters ctx)
+        protected virtual void OnAsyncGetGlobalListItems(string action, ContextParameters ctx)
         {
             QueryResult<Dictionary<string, object>> result;
             using (var db = new DataBaseContext())
@@ -981,19 +977,19 @@ WHERE
             }
             Response.Write(JsonConvert.SerializeObject(result));
         }
-        private void runAction(Action<string, string, ContextParameters> run, string action = null, string data = null, ContextParameters ctx = null)
+        private void runAction(Action<string, ContextParameters> run, string action = null, ContextParameters ctx = null)
         {
             Response.ClearContent();
             Response.Clear();
             Response.Expires = 0;
             Response.BufferOutput = false;
             Response.ContentType = "application/json";
-            run(action, data, ctx);
+            run(action, ctx);
             Response.Flush();
             Response.End();
         }
-        private void runAction(Action run) => runAction((action, data, ctx) => run());
-        private void runAction(Action<string> run, string action = null) => runAction((_, data, ctx) => run(action));
+        private void runAction(Action run) => runAction((action, ctx) => run());
+        private void runAction(Action<string> run, string action = null) => runAction((_, ctx) => run(action));
         private List<string> filterFields(List<string> allFields, string[] rules)
         {
             var filtered = new List<string>();
