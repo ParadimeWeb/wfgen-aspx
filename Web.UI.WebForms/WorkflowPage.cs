@@ -21,6 +21,7 @@ using ParadimeWeb.WorkflowGen.Data;
 using ParadimeWeb.WorkflowGen.Data.GraphQL;
 using Newtonsoft.Json.Linq;
 using System.Net;
+using System.IO.Compression;
 
 namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
 {
@@ -615,21 +616,42 @@ GROUP BY
             {
                 if (fileParam.Direction == ContextParameter.Directions.Out || !FormData.Tables[TableNames.Table1].Columns.Contains(fileParam.Name)) continue;
                 var fileCtx = fileParam.Value as ContextFileReference;
-                if (!string.IsNullOrEmpty(fileCtx.Path))
+                if (string.IsNullOrEmpty(fileCtx.Path)) continue;
+
+                var queryString = HttpUtility.ParseQueryString(string.Empty);
+                var fieldValue = FormData.GetParam(fileParam.Name);
+                var isZipMode = fieldValue != null && ((string)fieldValue).StartsWith("zip");
+                var originalFilePath = Path.Combine(StoragePath, Path.GetFileName(fileCtx.Path));
+                var fileDirectory = Path.Combine(StoragePath, "file", fileParam.Name);
+                if (isZipMode)
                 {
-                    var originalFilePath = Path.Combine(StoragePath, Path.GetFileName(fileCtx.Path));
-                    var fileDirectory = Path.Combine(StoragePath, "file", fileParam.Name);
-                    if (File.Exists(originalFilePath))
+                    using (var zipFile = ZipFile.OpenRead(originalFilePath))
                     {
-                        Directory.CreateDirectory(fileDirectory);
-                        File.Move(originalFilePath, Path.Combine(fileDirectory, fileCtx.Name));
+                        if (File.Exists(originalFilePath))
+                        {
+                            Directory.CreateDirectory(fileDirectory);
+                            zipFile.ExtractToDirectory(fileDirectory);
+                        }
+                        for (int i = 0; i < zipFile.Entries.Count; i++)
+                        {
+                            var entry = zipFile.Entries[i];
+                            queryString.Add("Key", $"Zip{i}");
+                            queryString.Add("Path", Path.Combine("file", fileParam.Name, entry.Name));
+                            queryString.Add("Name", entry.Name);
+                        }
                     }
-                    var queryString = HttpUtility.ParseQueryString(string.Empty);
-                    queryString.Add("Key", fileParam.Name);
-                    queryString.Add("Path", Path.Combine("file", fileParam.Name, fileCtx.Name));
-                    queryString.Add("Name", fileCtx.Name);
                     FormData.SetParam(fileParam.Name, queryString);
+                    continue;
                 }
+                if (File.Exists(originalFilePath))
+                {
+                    Directory.CreateDirectory(fileDirectory);
+                    File.Move(originalFilePath, Path.Combine(fileDirectory, fileCtx.Name));
+                }
+                queryString.Add("Key", fileParam.Name);
+                queryString.Add("Path", Path.Combine("file", fileParam.Name, fileCtx.Name));
+                queryString.Add("Name", fileCtx.Name);
+                FormData.SetParam(fileParam.Name, queryString);
             }
 
             var gridViewTables = OnFormDataInit();
@@ -668,13 +690,45 @@ GROUP BY
             OnPreAsyncInit(action, ctx);
             Response.Write(FormData.GetInitData(LangId, UserTimeZoneInfo));
         }
-        protected virtual void OnPreSubmit(string action) { }
-        protected virtual void OnPreAsyncSubmit(string action, ContextParameters ctx)
+         protected virtual void OnPreAsyncSubmit(string action, ContextParameters ctx)
         {
             FillFormData();
-            FormData.SetFormAction(wfgenAction);
+            //
+            // handle files
+            //
+            ctx.ApplyFilter(typeof(ContextFileReference), ContextParameters.ComparisonOperators.Equals);
+            foreach (var fileParam in ctx)
+            {
+                if (fileParam.Direction == ContextParameter.Directions.In || !FormData.Tables[TableNames.Table1].Columns.Contains(fileParam.Name)) continue;
+                var fieldVal = FormData.GetParam(fileParam.Name);
+                if (fieldVal == null) continue;
+                var queryString = HttpUtility.ParseQueryString((string)fieldVal);
+                var key = queryString["Key"];
+                if (key == null) continue;
+                var keys = key.Split(',');
+                if (keys.Length > 1)
+                {
+                    //
+                    // Zip file
+                    //
+                    var zipFileFieldValue = Path.Combine("zip", fileParam.Name, "Files.zip");
+                    using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, zipFileFieldValue), ZipArchiveMode.Create))
+                    {
+                        var paths = queryString["Path"].Split(',');
+                        var names = queryString["Name"].Split(',');
+                        for (int i = 0; i < paths.Length; i++)
+                        {
+                            zipFile.CreateEntryFromFile(Path.Combine(StoragePath, paths[i]), names[i]);
+                        }
+                        FormData.SetParam(fileParam.Name, zipFileFieldValue);
+                    }
+                    continue;
+                }
+                FormData.SetParam(fileParam.Name, queryString["Path"]);
+            }
+
+            FormData.SetFormAction(action);
             FormData.SetFormArchiveFileName("form_archive.htm");
-            OnPreSubmit(wfgenAction);
             FormData.SetConfigurationParam(ConfigurationColumn.Modified, DateTime.Now);
             FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
             var htmlDocument = Utils.GetFormArchive(FormData.ProcessInstanceId(), FormData.ActivityInstanceId(), delegatorCookie?.Value, Utils.GetHtmlPath(Context), Request.Url);
