@@ -22,6 +22,8 @@ using ParadimeWeb.WorkflowGen.Data.GraphQL;
 using Newtonsoft.Json.Linq;
 using System.Net;
 using System.IO.Compression;
+using System.Web.UI.WebControls;
+using System.Security.Policy;
 
 namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
 {
@@ -616,9 +618,14 @@ GROUP BY
             {
                 if (fileParam.Direction == ContextParameter.Directions.Out || !FormData.Tables[TableNames.Table1].Columns.Contains(fileParam.Name)) continue;
                 var fileCtx = fileParam.Value as ContextFileReference;
-                if (string.IsNullOrEmpty(fileCtx.Path)) continue;
-
                 var queryString = HttpUtility.ParseQueryString(string.Empty);
+                if (string.IsNullOrEmpty(fileCtx.Path))
+                {
+                    queryString.Add("Key", fileParam.Name);
+                    FormData.SetParam(fileParam.Name, queryString.ToString());
+                    continue;
+                }
+
                 var fieldValue = FormData.GetParam(fileParam.Name);
                 var isZipMode = fieldValue != null && ((string)fieldValue).StartsWith("zip");
                 var originalFilePath = Path.Combine(StoragePath, Path.GetFileName(fileCtx.Path));
@@ -640,7 +647,7 @@ GROUP BY
                             queryString.Add("Name", entry.Name);
                         }
                     }
-                    FormData.SetParam(fileParam.Name, queryString);
+                    FormData.SetParam(fileParam.Name, queryString.ToString());
                     continue;
                 }
                 if (File.Exists(originalFilePath))
@@ -651,7 +658,7 @@ GROUP BY
                 queryString.Add("Key", fileParam.Name);
                 queryString.Add("Path", Path.Combine("file", fileParam.Name, fileCtx.Name));
                 queryString.Add("Name", fileCtx.Name);
-                FormData.SetParam(fileParam.Name, queryString);
+                FormData.SetParam(fileParam.Name, queryString.ToString());
             }
 
             var gridViewTables = OnFormDataInit();
@@ -690,7 +697,8 @@ GROUP BY
             OnPreAsyncInit(action, ctx);
             Response.Write(FormData.GetInitData(LangId, UserTimeZoneInfo));
         }
-         protected virtual void OnPreAsyncSubmit(string action, ContextParameters ctx)
+        protected virtual void OnPreSubmit(string action) {}
+        protected virtual void OnAsyncSubmit(string action, ContextParameters ctx)
         {
             FillFormData();
             //
@@ -704,7 +712,11 @@ GROUP BY
                 if (fieldVal == null) continue;
                 var queryString = HttpUtility.ParseQueryString((string)fieldVal);
                 var key = queryString["Key"];
-                if (key == null) continue;
+                if (key == null)
+                {
+                    FormData.SetParam(fileParam.Name, "");
+                    continue;
+                }
                 var keys = key.Split(',');
                 if (keys.Length > 1)
                 {
@@ -729,14 +741,13 @@ GROUP BY
 
             FormData.SetFormAction(action);
             FormData.SetFormArchiveFileName("form_archive.htm");
+
+            OnPreSubmit(action);
+
             FormData.SetConfigurationParam(ConfigurationColumn.Modified, DateTime.Now);
             FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
             var htmlDocument = Utils.GetFormArchive(FormData.ProcessInstanceId(), FormData.ActivityInstanceId(), delegatorCookie?.Value, Utils.GetHtmlPath(Context), Request.Url);
             htmlDocument.Save(Path.Combine(StoragePath, FormData.FormArchiveFileName()), Encoding.UTF8);
-        }
-        protected virtual void OnAsyncSubmit(string action, ContextParameters ctx)
-        {
-            OnPreAsyncSubmit(action, ctx);
             Response.Write(JsonConvert.SerializeObject(new { replyTo = replyToUrl }));
         }
         protected virtual void OnDownload(string action, ContextParameters ctx)
@@ -758,36 +769,51 @@ GROUP BY
             Response.AddHeader("Accept-Ranges", "bytes");
             Response.TransmitFile(filePath);
         }
-        protected virtual void OnPreAsyncUpload(string action, ContextParameters ctx, out List<object> files)
+        private object saveUploadFile(int index, HttpPostedFile uploadFile, string[] fields)
         {
-            files = new List<object>();
-            dynamic fileUploads = JsonConvert.DeserializeObject(Request["fileUploads"]);
+            var mode = Request.Form["mode"];
+            var field = fields[0];
+            var Key = $"Zip{index}";
+            if (mode != "zip")
+            {
+                field = fields[index];
+                Key = field;
+            }
+            var uploadPath = Path.Combine(StoragePath, "upload", field);
+            var fileName = Path.GetFileName(uploadFile.FileName);
+            var filePath = Path.Combine(uploadPath, fileName);
+            if (filePath.Length > 259)
+            {
+                return new
+                {
+                    Error = "errorPathTooLong",
+                    Name = fileName
+                };
+            }
+            Directory.CreateDirectory(uploadPath);
+            uploadFile.SaveAs(filePath);
+            return new
+            {
+                Key,
+                Path = $"upload\\{field}\\{fileName}",
+                Name = fileName
+            };
+        }
+        protected virtual List<object> OnPreAsyncUpload(string action, ContextParameters ctx)
+        {
+            var mode = Request.Form["mode"];
+            var fields = Request.Form["field"].Split(',');
+            var queryString = HttpUtility.ParseQueryString(string.Empty);
+            var files = new List<object>();
             for (var i = 0; i < Request.Files.Count; i++)
             {
-                dynamic fileUpload = fileUploads[i];
-                string field = fileUpload.field;
-                var uploadFile = Request.Files[i];
-                var uploadPath = Path.Combine(StoragePath, "upload", field);
-                var fileName = Path.GetFileName(uploadFile.FileName);
-                var filePath = Path.Combine(uploadPath, fileName);
-                if (filePath.Length > 259)
-                {
-                    fileUpload.error = "errorPathTooLong";
-                    fileUpload.name = fileName;
-                    files.Add(fileUpload);
-                    continue;
-                }
-                Directory.CreateDirectory(uploadPath);
-                uploadFile.SaveAs(filePath);
-                fileUpload.path = Path.Combine("upload", field, fileName);
-                files.Add(fileUpload);
+                files.Add(saveUploadFile(i, Request.Files[i], fields));
             }
+            return files;
         }
         protected virtual void OnAsyncUpload(string action, ContextParameters ctx)
         {
-            List<object> files;
-            OnPreAsyncUpload(action, ctx, out files);
-            Response.Write(JsonConvert.SerializeObject(files));
+            Response.Write(JsonConvert.SerializeObject(OnPreAsyncUpload(action, ctx)));
         }
         protected virtual void OnBeforeAsyncSave() { }
         protected virtual void OnAsyncSave(string action, ContextParameters ctx)
@@ -896,10 +922,10 @@ WHERE
                         var paramValue = FormData.GetParam(tableName, paramName, row);
                         if (paramValue == null)
                         {
-                            if (dataSetId.HasValue)
-                            {
-                                deleteDataset.Add(dataSetId.Value);
-                            }
+                            //if (dataSetId.HasValue)
+                            //{
+                            //    deleteDataset.Add(dataSetId.Value);
+                            //}
                             continue;
                         }
                         if (dataType == "FILE")
@@ -907,13 +933,64 @@ WHERE
                             var filePath = (string)paramValue;
                             if (!filePath.StartsWith("upload"))
                             {
-                                if (filePath.StartsWith("delete") && dataSetId.HasValue)
-                                {
-                                    deleteDataset.Add(dataSetId.Value);
-                                }
+                                //if (filePath.StartsWith("delete") && dataSetId.HasValue)
+                                //{
+                                //    deleteDataset.Add(dataSetId.Value);
+                                //}
+                                variables.Add(new Variable(variableName, null, "FileInput"));
+                                parameters.Add($"{{ name: \"{dataName}\", fileValue: ${variableName} }}");
                                 continue;
                             }
                             var fileName = Path.GetFileName(filePath);
+
+
+
+
+
+
+
+
+                            var queryString = HttpUtility.ParseQueryString((string)paramValue);
+                            var key = queryString["Key"];
+                            if (key == null)
+                            {
+                                FormData.SetParam(paramName, "");
+                                continue;
+                            }
+                            var keys = key.Split(',');
+                            if (keys.Length > 1)
+                            {
+                                //
+                                // Zip file
+                                //
+                                filePath = Path.Combine("zip", paramName, "Files.zip");
+                                using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, filePath), ZipArchiveMode.Create))
+                                {
+                                    var paths = queryString["Path"].Split(',');
+                                    var names = queryString["Name"].Split(',');
+                                    for (int i = 0; i < paths.Length; i++)
+                                    {
+                                        zipFile.CreateEntryFromFile(Path.Combine(StoragePath, paths[i]), names[i]);
+                                    }
+                                    FormData.SetParam(paramName, filePath);
+                                }
+                            }
+                            else
+                            {
+                                filePath = queryString["Path"];
+                                FormData.SetParam(paramName, filePath);
+                            }
+                                
+
+
+
+
+
+
+
+
+
+                            
                             using (var fs = new FileStream(Path.Combine(StoragePath, filePath), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                             {
                                 var uri = new Uri(fs.Name);
@@ -947,12 +1024,12 @@ WHERE
                 }
                 r.Close();
 
-                if (deleteDataset.Count > 0)
-                {
-                    cmd.CommandText = $"DELETE FROM [WFDATASET_VALUE] WHERE [ID_DATASET] IN ({string.Join(", ", deleteDataset)})";
-                    cmd.Parameters.Clear();
-                    cmd.ExecuteNonQuery();
-                }
+                //if (deleteDataset.Count > 0)
+                //{
+                //    cmd.CommandText = $"DELETE FROM [WFDATASET_VALUE] WHERE [ID_DATASET] IN ({string.Join(", ", deleteDataset)})";
+                //    cmd.Parameters.Clear();
+                //    cmd.ExecuteNonQuery();
+                //}
             }
 
             var query = $@"updateRequestDataset(input: {{ 
