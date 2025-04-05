@@ -24,6 +24,7 @@ using System.Net;
 using System.IO.Compression;
 using System.Web.UI.WebControls;
 using System.Security.Policy;
+using System.Runtime.Remoting.Contexts;
 
 namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
 {
@@ -627,7 +628,7 @@ GROUP BY
                 }
 
                 var fieldValue = FormData.GetParam(fileParam.Name);
-                var isZipMode = fieldValue != null && ((string)fieldValue).StartsWith("zip");
+                var isZipMode = fileCtx.OriginalPath.IndexOf($"\\zip\\{fileParam.Name}\\") > 0;
                 var originalFilePath = Path.Combine(StoragePath, Path.GetFileName(fileCtx.Path));
                 var fileDirectory = Path.Combine(StoragePath, "file", fileParam.Name);
                 if (isZipMode)
@@ -647,6 +648,7 @@ GROUP BY
                             queryString.Add("Name", entry.Name);
                         }
                     }
+                    File.Delete(originalFilePath);
                     FormData.SetParam(fileParam.Name, queryString.ToString());
                     continue;
                 }
@@ -712,11 +714,8 @@ GROUP BY
                 if (fieldVal == null) continue;
                 var queryString = HttpUtility.ParseQueryString((string)fieldVal);
                 var key = queryString["Key"];
-                if (key == null)
-                {
-                    FormData.SetParam(fileParam.Name, "");
-                    continue;
-                }
+                if (key == null) continue;
+
                 var keys = key.Split(',');
                 if (keys.Length > 1)
                 {
@@ -724,6 +723,7 @@ GROUP BY
                     // Zip file
                     //
                     var zipFileFieldValue = Path.Combine("zip", fileParam.Name, "Files.zip");
+                    Directory.CreateDirectory(Path.Combine(StoragePath, "zip", fileParam.Name));
                     using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, zipFileFieldValue), ZipArchiveMode.Create))
                     {
                         var paths = queryString["Path"].Split(',');
@@ -822,7 +822,6 @@ GROUP BY
             FormData.SetFormArchiveFileName("form_archive.htm");
             OnBeforeAsyncSave();
             FormData.SetConfigurationParam(ConfigurationColumn.Modified, DateTime.Now);
-            FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
 
             var activityId = FormData.ActivityId();
             var processInstanceId = FormData.ProcessInstanceId();
@@ -830,6 +829,8 @@ GROUP BY
             var deleteDataset = new List<int>();
             var parameters = new List<string>();
             var variables = new List<Variable>();
+            var saveFormData = new List<string>();
+            var saveFormArchive = new List<string>();
             //
             // handle parameters
             //
@@ -865,171 +866,139 @@ WHERE
                     var dataName = r.GetString(1);
                     if (paramName == "FORM_DATA")
                     {
-                        var fileName = Path.GetFileName(instancePath);
-                        using (var fs = new FileStream(instancePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                        {
-                            var uri = new Uri(fs.Name);
-                            variables.Add(new Variable(variableName, JObject.FromObject(new
-                            {
-                                name = fileName,
-                                contentType = "application/xml",
-                                size = fs.Length,
-                                updatedAt = DateTime.UtcNow.ToString("O"),
-                                url = uri.AbsoluteUri
-                            }), "FileInput"));
-                            parameters.Add($"{{ name: \"{dataName}\", fileValue: ${variableName} }}");
-                        }
+                        saveFormData.AddRange(new string[] { variableName, dataName });
+                        continue;
                     }
-                    else if (paramName == Table1Column.FormArchive)
+                    if (paramName == Table1Column.FormArchive)
                     {
-                        var fileName = FormData.FormArchiveFileName();
-                        var formArchive = Utils.GetFormArchive(processInstanceId, activityInstanceId, delegatorCookie?.Value, Utils.GetHtmlPath(Context), Request.Url);
-                        var fileFullName = Path.Combine(StoragePath, fileName);
-                        formArchive.Save(fileFullName, Encoding.UTF8);
-                        using (var fs = new FileStream(fileFullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                        {
-                            var uri = new Uri(fs.Name);
-                            variables.Add(new Variable(variableName, JObject.FromObject(new
-                            {
-                                name = fileName,
-                                contentType = "text/html",
-                                size = fs.Length,
-                                updatedAt = DateTime.UtcNow.ToString("O"),
-                                url = uri.AbsoluteUri
-                            }), "FileInput"));
-                            parameters.Add($"{{ name: \"{dataName}\", fileValue: ${variableName} }}");
-                        }
+                        saveFormArchive.AddRange(new string[] { variableName, dataName });
+                        continue;
                     }
-                    else
+
+                    var tableName = TableNames.Table1;
+                    //
+                    // NewDataSet/__Approvals[1]/approved
+                    var paramNameSplit = paramName.Split('/');
+                    if (paramNameSplit.Length > 2)
                     {
-                        var tableName = TableNames.Table1;
-                        //
-                        // NewDataSet/__Approvals[1]/approved
-                        var paramNameSplit = paramName.Split('/');
-                        if (paramNameSplit.Length > 2)
+                        var tableNameSplit = paramNameSplit[1].Split(new char[] { '[', ']' });
+                        tableName = tableNameSplit[0];
+                        if (tableNameSplit.Length > 1)
                         {
-                            var tableNameSplit = paramNameSplit[1].Split(new char[] { '[', ']' });
-                            tableName = tableNameSplit[0];
-                            if (tableNameSplit.Length > 1)
-                            {
-                                row = Convert.ToInt32(tableNameSplit[1]) - 1;
-                            }
-                            paramName = paramNameSplit[2];
+                            row = Convert.ToInt32(tableNameSplit[1]) - 1;
                         }
-                        if (!FormData.Tables[tableName].Columns.Contains(paramName)) continue;
-                        var dataType = r.GetString(2);
-                        var dataSetId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3);
-                        var paramValue = FormData.GetParam(tableName, paramName, row);
-                        if (paramValue == null)
+                        paramName = paramNameSplit[2];
+                    }
+                    if (!FormData.Tables[tableName].Columns.Contains(paramName)) continue;
+                    var dataType = r.GetString(2);
+                    var dataSetId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3);
+                    var paramValue = FormData.GetParam(tableName, paramName, row);
+
+                    if (dataType == "FILE")
+                    {
+                        var queryString = HttpUtility.ParseQueryString((string)paramValue);
+                        var key = queryString["Key"];
+                        if (key == null) continue;
+
+                        var filePath = queryString["Path"];
+                        if (filePath == null)
                         {
-                            //if (dataSetId.HasValue)
-                            //{
-                            //    deleteDataset.Add(dataSetId.Value);
-                            //}
+                            variables.Add(new Variable(variableName, JObject.FromObject(new { content = (string)null }), "FileInput"));
+                            parameters.Add($"{{ name: \"{dataName}\", fileValue: ${variableName} }}");
                             continue;
                         }
-                        if (dataType == "FILE")
+                        if (!filePath.StartsWith("upload")) continue;
+                        var keys = key.Split(',');
+                        if (keys.Length > 1)
                         {
-                            var filePath = (string)paramValue;
-                            if (!filePath.StartsWith("upload"))
+                            //
+                            // Zip file
+                            //
+                            filePath = Path.Combine("zip", paramName, "Files.zip");
+                            Directory.CreateDirectory(Path.Combine(StoragePath, "zip", paramName));
+                            using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, filePath), ZipArchiveMode.Create))
                             {
-                                //if (filePath.StartsWith("delete") && dataSetId.HasValue)
-                                //{
-                                //    deleteDataset.Add(dataSetId.Value);
-                                //}
-                                variables.Add(new Variable(variableName, null, "FileInput"));
-                                parameters.Add($"{{ name: \"{dataName}\", fileValue: ${variableName} }}");
-                                continue;
-                            }
-                            var fileName = Path.GetFileName(filePath);
-
-
-
-
-
-
-
-
-                            var queryString = HttpUtility.ParseQueryString((string)paramValue);
-                            var key = queryString["Key"];
-                            if (key == null)
-                            {
-                                FormData.SetParam(paramName, "");
-                                continue;
-                            }
-                            var keys = key.Split(',');
-                            if (keys.Length > 1)
-                            {
-                                //
-                                // Zip file
-                                //
-                                filePath = Path.Combine("zip", paramName, "Files.zip");
-                                using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, filePath), ZipArchiveMode.Create))
+                                var paths = queryString["Path"].Split(',');
+                                var names = queryString["Name"].Split(',');
+                                for (int i = 0; i < paths.Length; i++)
                                 {
-                                    var paths = queryString["Path"].Split(',');
-                                    var names = queryString["Name"].Split(',');
-                                    for (int i = 0; i < paths.Length; i++)
-                                    {
-                                        zipFile.CreateEntryFromFile(Path.Combine(StoragePath, paths[i]), names[i]);
-                                    }
-                                    FormData.SetParam(paramName, filePath);
+                                    zipFile.CreateEntryFromFile(Path.Combine(StoragePath, paths[i]), names[i]);
                                 }
                             }
-                            else
+                        }
+                        FormData.SetParam(paramName, filePath);
+                        var fileName = Path.GetFileName(filePath);
+
+                        using (var fs = new FileStream(Path.Combine(StoragePath, filePath), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        {
+                            var uri = new Uri(fs.Name);
+                            variables.Add(new Variable(variableName, JObject.FromObject(new
                             {
-                                filePath = queryString["Path"];
-                                FormData.SetParam(paramName, filePath);
-                            }
-                                
-
-
-
-
-
-
-
-
-
-                            
-                            using (var fs = new FileStream(Path.Combine(StoragePath, filePath), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                            {
-                                var uri = new Uri(fs.Name);
-                                variables.Add(new Variable(variableName, JObject.FromObject(new
-                                {
-                                    name = fileName,
-                                    contentType = MimeMapping.GetMimeMapping(fileName),
-                                    size = fs.Length,
-                                    updatedAt = DateTime.UtcNow.ToString("O"),
-                                    url = uri.AbsoluteUri
-                                }), "FileInput"));
-                                parameters.Add($"{{ name: \"{dataName}\", fileValue: ${variableName} }}");
-                            }
+                                name = fileName,
+                                contentType = MimeMapping.GetMimeMapping(fileName),
+                                size = fs.Length,
+                                updatedAt = DateTime.UtcNow.ToString("O"),
+                                url = uri.AbsoluteUri
+                            }), "FileInput"));
+                            parameters.Add($"{{ name: \"{dataName}\", fileValue: ${variableName} }}");
                         }
-                        else if (dataType == "NUMERIC")
-                        {
-                            variables.Add(new Variable(variableName, JToken.FromObject(paramValue), "Float"));
-                            parameters.Add($"{{ name: \"{dataName}\", numericValue: ${variableName} }}");
-                        }
-                        else if (dataType == "DATETIME")
-                        {
-                            variables.Add(new Variable(variableName, ((DateTime)paramValue).ToUniversalTime().ToString("O"), "DateTime"));
-                            parameters.Add($"{{ name: \"{dataName}\", dateTimeValue: ${variableName} }}");
-                        }
-                        else
-                        {
-                            variables.Add(new Variable(variableName, JToken.FromObject(paramValue), "String"));
-                            parameters.Add($"{{ name: \"{dataName}\", textValue: ${variableName} }}");
-                        }
+                        continue;
                     }
+                    if (dataType == "NUMERIC")
+                    {
+                        variables.Add(new Variable(variableName, paramValue == null ? null : JToken.FromObject(paramValue), "Float"));
+                        parameters.Add($"{{ name: \"{dataName}\", numericValue: ${variableName} }}");
+                        continue;
+                    }
+                    if (dataType == "DATETIME")
+                    {
+                        variables.Add(new Variable(variableName, paramValue == null ? null : ((DateTime)paramValue).ToUniversalTime().ToString("O"), "DateTime"));
+                        parameters.Add($"{{ name: \"{dataName}\", dateTimeValue: ${variableName} }}");
+                        continue;
+                    }
+                    variables.Add(new Variable(variableName, paramValue == null ? null : JToken.FromObject(paramValue), "String"));
+                    parameters.Add($"{{ name: \"{dataName}\", textValue: ${variableName} }}");
                 }
-                r.Close();
+            }
 
-                //if (deleteDataset.Count > 0)
-                //{
-                //    cmd.CommandText = $"DELETE FROM [WFDATASET_VALUE] WHERE [ID_DATASET] IN ({string.Join(", ", deleteDataset)})";
-                //    cmd.Parameters.Clear();
-                //    cmd.ExecuteNonQuery();
-                //}
+            FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
+
+            if (saveFormData.Count > 0) 
+            {
+                var fileName = Path.GetFileName(instancePath);
+                using (var fs = new FileStream(instancePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var uri = new Uri(fs.Name);
+                    variables.Add(new Variable(saveFormData[0], JObject.FromObject(new
+                    {
+                        name = fileName,
+                        contentType = "application/xml",
+                        size = fs.Length,
+                        updatedAt = DateTime.UtcNow.ToString("O"),
+                        url = uri.AbsoluteUri
+                    }), "FileInput"));
+                    parameters.Add($"{{ name: \"{saveFormData[1]}\", fileValue: ${saveFormData[0]} }}");
+                }
+            }
+            if (saveFormArchive.Count > 0) 
+            {
+                var fileName = FormData.FormArchiveFileName();
+                var formArchive = Utils.GetFormArchive(processInstanceId, activityInstanceId, delegatorCookie?.Value, Utils.GetHtmlPath(Context), Request.Url);
+                var fileFullName = Path.Combine(StoragePath, fileName);
+                formArchive.Save(fileFullName, Encoding.UTF8);
+                using (var fs = new FileStream(fileFullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var uri = new Uri(fs.Name);
+                    variables.Add(new Variable(saveFormArchive[0], JObject.FromObject(new
+                    {
+                        name = fileName,
+                        contentType = "text/html",
+                        size = fs.Length,
+                        updatedAt = DateTime.UtcNow.ToString("O"),
+                        url = uri.AbsoluteUri
+                    }), "FileInput"));
+                    parameters.Add($"{{ name: \"{saveFormArchive[1]}\", fileValue: ${saveFormArchive[0]} }}");
+                }
             }
 
             var query = $@"updateRequestDataset(input: {{ 
@@ -1037,7 +1006,7 @@ WHERE
     parameters: [{string.Join(", ", parameters)}] 
 }}) {{ clientMutationId }}";
 
-            Client.CreateClient(Client.DefaultUrl, new NetworkCredential("wfgen_admin", "WorkflowGen1!"));
+            Client.CreateClient(Client.DefaultUrl);
             try
             {
                 Client.Mutation(query, variables.ToArray());
