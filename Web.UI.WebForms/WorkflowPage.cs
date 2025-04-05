@@ -735,7 +735,7 @@ GROUP BY
                 FormData.SetParam(fileParam.Name, queryString["Path"]);
             }
 
-            FormData.SetFormAction(action);
+            FormData.SetFormAction(action.Remove(0, 6));
             FormData.SetFormArchiveFileName("form_archive.htm");
 
             OnPreSubmit(action);
