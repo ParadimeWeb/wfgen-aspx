@@ -20,11 +20,7 @@ using WorkflowGen.My.Security;
 using ParadimeWeb.WorkflowGen.Data;
 using ParadimeWeb.WorkflowGen.Data.GraphQL;
 using Newtonsoft.Json.Linq;
-using System.Net;
 using System.IO.Compression;
-using System.Web.UI.WebControls;
-using System.Security.Policy;
-using System.Runtime.Remoting.Contexts;
 
 namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
 {
@@ -523,10 +519,10 @@ WHERE
                 var appUrl = ConfigurationManager.AppSettings["ApplicationUrl"];
                 comm.CommandText = @"SELECT 
 	[PARAM],
-    RD.NAME,
     RD.ID_PROCESS,
     RD.ID_RELDATA,
-    AIRD.ID_DATASET
+    AIRD.ID_DATASET,
+    VALUE_FILE_NAME
 FROM 
     WFRELDATA RD
     JOIN WFACTIVITY_PARAM AP ON RD.ID_RELDATA = AP.ID_RELDATA AND RD.ID_PROCESS = AP.ID_PROCESS
@@ -539,16 +535,16 @@ WHERE
     AND AIRD.ID_PROCESS_INST = @processInstId AND AIRD.ID_ACTIVITY_INST = @activityInstId
 GROUP BY
     [PARAM],
-    RD.NAME,
     RD.ID_PROCESS,
     RD.ID_RELDATA,
-    AIRD.ID_DATASET;
+    AIRD.ID_DATASET,
+    VALUE_FILE_NAME;
 SELECT 
     [PARAM],
-    RD.NAME,
     RD.ID_PROCESS,
     RD.ID_RELDATA,
-    PIRD.ID_DATASET
+    PIRD.ID_DATASET,
+    VALUE_FILE_NAME
 FROM 
     WFRELDATA RD
     JOIN WFACTIVITY_PARAM AP ON RD.ID_RELDATA = AP.ID_RELDATA AND RD.ID_PROCESS = AP.ID_PROCESS
@@ -559,27 +555,27 @@ WHERE
     AND ID_PROCESS_INST = @processInstId
 GROUP BY
 	[PARAM],
-	RD.NAME,
     RD.ID_PROCESS,
     RD.ID_RELDATA,
-    PIRD.ID_DATASET;";
+    PIRD.ID_DATASET,
+    VALUE_FILE_NAME;";
                 comm.Parameters.AddWithValue("@processInstId", processInstId);
                 comm.Parameters.AddWithValue("@activityInstId", activityInstId);
                 using (var r = comm.ExecuteReader())
                 {
+                    var completedFiles = new HashSet<string>();
                     do
                     {
                         while (r.Read())
                         {
                             var fileParamName = r.GetString(0);
-                            var fileUrlParamName = $"{fileParamName}_URL";
-                            var fileDataName = r.GetString(1);
-                            var url = Utils.GetFileDownloadUrl(appUrl, r.GetInt32(2), r.GetInt32(3), r.GetInt32(4), delegatorId);
-                            if (FormData.Tables[TableNames.Table1].Columns.Contains(fileParamName) && !FormData.Tables[TableNames.Table1].Columns.Contains(fileUrlParamName))
-                            {
-                                FormData.Tables[TableNames.Table1].Columns.Add(new DataColumn(fileUrlParamName, typeof(string)));
-                                FormData.SetParam(fileUrlParamName, url);
-                            }
+                            if (!FormData.HasParam(fileParamName) || !completedFiles.Add(fileParamName)) continue;
+
+                            var queryString = HttpUtility.ParseQueryString(string.Empty);
+                            queryString.Add("Key", fileParamName);
+                            queryString.Add("Path", Utils.GetFileDownloadUrl(appUrl, r.GetInt32(1), r.GetInt32(2), r.GetInt32(3), delegatorId));
+                            queryString.Add("Name", r.GetString(4));
+                            FormData.SetParam(fileParamName, queryString.ToString());
                         }
                     }
                     while (r.NextResult());
@@ -752,10 +748,9 @@ GROUP BY
         }
         protected virtual void OnDownload(string action, ContextParameters ctx)
         {
-            //dynamic json = JsonConvert.DeserializeObject(data);
-            dynamic json = JsonConvert.DeserializeObject("");
-            string filePath = json.f;
-            string dispositionType = json.t;
+            var filePath = Request.Form["FILE_PATH"];
+            var dispositionType = Request.Form["FILE_DISPOSITION_TYPE"];
+
             if (dispositionType != "attachment")
             {
                 dispositionType = "inline";

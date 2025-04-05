@@ -91,6 +91,10 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             }
             return val == DBNull.Value ? null : val;
         }
+        public static bool HasParam(this System.Data.DataSet ds, string key, string tableName = TableNames.Table1)
+        {
+            return ds.Tables.Contains(tableName) && ds.Tables[tableName].Columns.Contains(key);
+        }
 
         public static void InitializeTable1(this System.Data.DataSet ds)
         {
