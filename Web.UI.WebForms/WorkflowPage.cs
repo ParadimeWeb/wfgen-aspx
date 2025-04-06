@@ -781,7 +781,7 @@ GROUP BY
             {
                 return new
                 {
-                    Error = "errorPathTooLong",
+                    Error = "File name, {{name}}, is too long. Try renaming it.",
                     Name = fileName
                 };
             }
@@ -796,7 +796,6 @@ GROUP BY
         }
         protected virtual List<object> OnPreAsyncUpload(string action, ContextParameters ctx)
         {
-            var mode = Request.Form["mode"];
             var fields = Request.Form["field"].Split(',');
             var queryString = HttpUtility.ParseQueryString(string.Empty);
             var files = new List<object>();
