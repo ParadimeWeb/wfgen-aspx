@@ -7,6 +7,7 @@
         public const string CurrentUser = "__CurrentUser";
         public const string Assignee = "__Assignee";
         public const string Approvals = "__Approvals";
+        public const string ZipFiles = "__ZipFiles";
         public const string Table1 = "Table1";
     }
 }

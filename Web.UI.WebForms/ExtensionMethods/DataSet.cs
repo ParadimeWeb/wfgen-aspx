@@ -234,6 +234,20 @@ WHERE
             }
         }
 
+        internal static DataTable EnsureZipTable(this System.Data.DataSet ds, string colName)
+        {
+            var table = ds.Tables.Contains(TableNames.ZipFiles) ? ds.Tables[TableNames.ZipFiles] : ds.Tables.Add(TableNames.ZipFiles);
+            if (table.Rows.Count == 0)
+            {
+                table.Rows.Add();
+            }
+            if (!table.Columns.Contains(colName)) 
+            {
+                table.Columns.Add(colName);
+            }
+            return table;
+        }
+
         internal static void CreateUserTableColumns(this DataTable dt, params KeyValuePair<string, Type>[] extendedAttributes)
         {
             dt.Columns.Add(UserColumn.Id, typeof(int));
@@ -267,6 +281,18 @@ WHERE
             CreateUserTableColumns(table, extendedAttributes);
             return table;
         }
+
+        public static DataTable CreateFilesTable(this System.Data.DataSet ds, string tableName)
+        {
+            if (ds.Tables.Contains(tableName))
+            {
+                return ds.Tables[tableName];
+            }
+            var table = ds.Tables.Add(tableName);
+            table.Columns.Add("Field", typeof(string));
+            return table;
+        }
+
         public static string ApprovalRole(this DataRow row) => (string)row[ApprovalColumn.Role];
         public static int? ApprovalProcessInstId(this DataRow row) => row.IsNull(ApprovalColumn.ProcessInstId) ? (int?)null : (int)row[ApprovalColumn.ProcessInstId];
         public static int? ApprovalActivityInstId(this DataRow row) => row.IsNull(ApprovalColumn.ActivityInstId) ? (int?)null : (int)row[ApprovalColumn.ActivityInstId];

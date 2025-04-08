@@ -696,6 +696,10 @@ GROUP BY
             Response.Write(FormData.GetInitData(LangId, UserTimeZoneInfo));
         }
         protected virtual void OnPreSubmit(string action) {}
+        private void ensureZipTable()
+        {
+
+        }
         protected virtual void OnAsyncSubmit(string action, ContextParameters ctx)
         {
             FillFormData();
@@ -709,20 +713,22 @@ GROUP BY
                 var fieldVal = FormData.GetParam(fileParam.Name);
                 if (fieldVal == null) continue;
                 var queryString = HttpUtility.ParseQueryString((string)fieldVal);
-                var key = queryString["Key"];
-                if (key == null) continue;
+                var filePath = queryString["Path"];
+                if (filePath == null) continue;
 
-                var keys = key.Split(',');
+                var keys = queryString["Key"].Split(',');
                 if (keys.Length > 1)
                 {
                     //
                     // Zip file
                     //
-                    var zipFileFieldValue = Path.Combine("zip", fileParam.Name, "Files.zip");
+                    var zipTable = FormData.EnsureZipTable(fileParam.Name);
+                    zipTable.Rows[0][fileParam.Name] = fieldVal;
+                    var zipFileFieldValue = Path.Combine("zip", fileParam.Name, $"{fileParam.Name}.zip");
                     Directory.CreateDirectory(Path.Combine(StoragePath, "zip", fileParam.Name));
                     using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, zipFileFieldValue), ZipArchiveMode.Create))
                     {
-                        var paths = queryString["Path"].Split(',');
+                        var paths = filePath.Split(',');
                         var names = queryString["Name"].Split(',');
                         for (int i = 0; i < paths.Length; i++)
                         {
@@ -732,7 +738,7 @@ GROUP BY
                     }
                     continue;
                 }
-                FormData.SetParam(fileParam.Name, queryString["Path"]);
+                FormData.SetParam(fileParam.Name, filePath);
             }
 
             FormData.SetFormAction(action.Remove(0, 6));
@@ -908,7 +914,9 @@ WHERE
                             //
                             // Zip file
                             //
-                            filePath = Path.Combine("zip", paramName, "Files.zip");
+                            var zipTable = FormData.EnsureZipTable(paramName);
+                            zipTable.Rows[0][paramName] = paramValue;
+                            filePath = Path.Combine("zip", paramName, $"{paramName}.zip");
                             Directory.CreateDirectory(Path.Combine(StoragePath, "zip", paramName));
                             using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, filePath), ZipArchiveMode.Create))
                             {
