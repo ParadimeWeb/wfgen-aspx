@@ -696,10 +696,6 @@ GROUP BY
             Response.Write(FormData.GetInitData(LangId, UserTimeZoneInfo));
         }
         protected virtual void OnPreSubmit(string action) {}
-        private void ensureZipTable()
-        {
-
-        }
         protected virtual void OnAsyncSubmit(string action, ContextParameters ctx)
         {
             FillFormData();
@@ -803,7 +799,6 @@ GROUP BY
         protected virtual List<object> OnPreAsyncUpload(string action, ContextParameters ctx)
         {
             var fields = Request.Form["field"].Split(',');
-            var queryString = HttpUtility.ParseQueryString(string.Empty);
             var files = new List<object>();
             for (var i = 0; i < Request.Files.Count; i++)
             {
@@ -1042,8 +1037,8 @@ WHERE
                 Request["query"],
                 Request["active"],
                 Request["archive"],
-                Request["dir"],
-                string.IsNullOrEmpty(Request["ea"]) ? new string[0] : Request["ea"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
+                Request["directory"],
+                string.IsNullOrEmpty(Request["extraAttributes"]) ? new string[0] : Request["extraAttributes"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
                 string.IsNullOrEmpty(Request["page"]) ? 1 : Convert.ToInt32(Request["page"]),
                 string.IsNullOrEmpty(Request["pageSize"]) ? 20 : Convert.ToInt32(Request["pageSize"]))));
         protected virtual void OnAsyncGetGroupUsers(string action, ContextParameters ctx) =>
