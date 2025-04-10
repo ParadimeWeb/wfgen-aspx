@@ -766,18 +766,17 @@ GROUP BY
             Response.AddHeader("Accept-Ranges", "bytes");
             Response.TransmitFile(filePath);
         }
-        private object saveUploadFile(int index, HttpPostedFile uploadFile, string[] fields)
+        protected virtual object OnPreAsyncUpload(string action, ContextParameters ctx)
         {
-            var mode = Request.Form["mode"];
-            var field = fields[0];
-            var Key = $"Zip{index}";
-            if (mode != "zip")
+            if (Request.Files.Count < 1)
             {
-                field = fields[index];
-                Key = field;
+                return new { Error = "No file" };
             }
+            var field = Request.Form["field"];
+            var mode = Request.Form["mode"];
+            var file = Request.Files[0];
             var uploadPath = Path.Combine(StoragePath, "upload", field);
-            var fileName = Path.GetFileName(uploadFile.FileName);
+            var fileName = Path.GetFileName(file.FileName);
             var filePath = Path.Combine(uploadPath, fileName);
             if (filePath.Length > 259)
             {
@@ -788,23 +787,21 @@ GROUP BY
                 };
             }
             Directory.CreateDirectory(uploadPath);
-            uploadFile.SaveAs(filePath);
-            return new
-            {
-                Key,
-                Path = $"upload\\{field}\\{fileName}",
-                Name = fileName
-            };
-        }
-        protected virtual List<object> OnPreAsyncUpload(string action, ContextParameters ctx)
-        {
-            var fields = Request.Form["field"].Split(',');
-            var files = new List<object>();
-            for (var i = 0; i < Request.Files.Count; i++)
-            {
-                files.Add(saveUploadFile(i, Request.Files[i], fields));
-            }
-            return files;
+            file.SaveAs(filePath);
+
+            return mode == "zip" ? 
+                new 
+                {
+                    Key = "Zip",
+                    Path = $"upload\\{field}\\{fileName}",
+                    Name = fileName
+                } : 
+                new 
+                {
+                    Key = field,
+                    Path = $"upload\\{field}\\{fileName}",
+                    Name = fileName
+                };
         }
         protected virtual void OnAsyncUpload(string action, ContextParameters ctx)
         {
