@@ -773,7 +773,7 @@ GROUP BY
                 return new { Error = "No file" };
             }
             var field = Request.Form["field"];
-            var mode = Request.Form["mode"];
+            var Key = Request.Form["key"];
             var file = Request.Files[0];
             var uploadPath = Path.Combine(StoragePath, "upload", field);
             var fileName = Path.GetFileName(file.FileName);
@@ -787,21 +787,17 @@ GROUP BY
                 };
             }
             Directory.CreateDirectory(uploadPath);
+            //
+            // TODO: Check if it overwrites file if exists
+            //
             file.SaveAs(filePath);
 
-            return mode == "zip" ? 
-                new 
-                {
-                    Key = "Zip",
-                    Path = $"upload\\{field}\\{fileName}",
-                    Name = fileName
-                } : 
-                new 
-                {
-                    Key = field,
-                    Path = $"upload\\{field}\\{fileName}",
-                    Name = fileName
-                };
+            return new
+            {
+                Key,
+                Path = $"upload\\{field}\\{fileName}",
+                Name = fileName
+            };
         }
         protected virtual void OnAsyncUpload(string action, ContextParameters ctx)
         {
