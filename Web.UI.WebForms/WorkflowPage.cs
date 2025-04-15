@@ -787,9 +787,7 @@ GROUP BY
                 };
             }
             Directory.CreateDirectory(uploadPath);
-            //
-            // TODO: Check if it overwrites file if exists
-            //
+            // SaveAs overwrites the file if it exists
             file.SaveAs(filePath);
 
             return new
