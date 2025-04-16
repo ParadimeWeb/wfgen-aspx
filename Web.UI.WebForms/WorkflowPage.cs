@@ -893,8 +893,9 @@ WHERE
                             parameters.Add($"{{ name: \"{dataName}\", fileValue: ${variableName} }}");
                             continue;
                         }
-                        if (!filePath.StartsWith("upload")) continue;
+                        
                         var keys = key.Split(',');
+                        if (keys.Length < 2 && !filePath.StartsWith("upload")) continue;
                         if (keys.Length > 1)
                         {
                             //
@@ -906,7 +907,7 @@ WHERE
                             Directory.CreateDirectory(Path.Combine(StoragePath, "zip", paramName));
                             using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, filePath), ZipArchiveMode.Create))
                             {
-                                var paths = queryString["Path"].Split(',');
+                                var paths = filePath.Split(',');
                                 var names = queryString["Name"].Split(',');
                                 for (int i = 0; i < paths.Length; i++)
                                 {
