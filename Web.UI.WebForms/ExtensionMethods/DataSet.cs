@@ -234,18 +234,25 @@ WHERE
             }
         }
 
-        internal static DataTable EnsureZipTable(this System.Data.DataSet ds, string colName)
+        internal static void SetZipFileParam(this System.Data.DataSet ds, string colName, object value)
         {
             var table = ds.Tables.Contains(TableNames.ZipFiles) ? ds.Tables[TableNames.ZipFiles] : ds.Tables.Add(TableNames.ZipFiles);
             if (table.Rows.Count == 0)
             {
                 table.Rows.Add();
             }
-            if (!table.Columns.Contains(colName)) 
+            if (value == null && table.Columns.Contains(colName))
+            {
+                table.Columns.Remove(colName);
+                return;
+            }
+            if (value == null) return;
+
+            if (!table.Columns.Contains(colName))
             {
                 table.Columns.Add(colName);
             }
-            return table;
+            table.Rows[0][colName] = value;
         }
 
         internal static void CreateUserTableColumns(this DataTable dt, params KeyValuePair<string, Type>[] extendedAttributes)
