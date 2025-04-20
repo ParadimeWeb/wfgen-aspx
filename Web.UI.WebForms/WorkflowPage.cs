@@ -709,11 +709,13 @@ GROUP BY
                 var fieldVal = FormData.GetParam(fileParam.Name);
                 if (fieldVal == null) continue;
                 var queryString = HttpUtility.ParseQueryString((string)fieldVal);
-                var filePath = queryString["Path"];
+                var paths = queryString["Path"]?.Split(',') ?? new string[0];
+                var noErrorPaths = paths.Where(p => !p.StartsWith("__Error"));
+                var filePath = noErrorPaths.FirstOrDefault();
                 if (filePath == null) continue;
 
                 FormData.SetZipFileParam(fileParam.Name, null);
-                if (queryString["Key"].Split(',').Length > 1)
+                if (noErrorPaths.Count() > 1)
                 {
                     //
                     // Zip file
@@ -723,10 +725,10 @@ GROUP BY
                     Directory.CreateDirectory(Path.Combine(StoragePath, "zip", fileParam.Name));
                     using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, zipFileFieldValue), ZipArchiveMode.Create))
                     {
-                        var paths = filePath.Split(',');
                         var names = queryString["Name"].Split(',');
                         for (int i = 0; i < paths.Length; i++)
                         {
+                            if (paths[i].StartsWith("__Error")) continue;
                             zipFile.CreateEntryFromFile(Path.Combine(StoragePath, paths[i]), names[i]);
                         }
                         FormData.SetParam(fileParam.Name, zipFileFieldValue);
@@ -884,8 +886,9 @@ WHERE
                         var queryString = HttpUtility.ParseQueryString((string)paramValue);
                         var key = queryString["Key"];
                         if (key == null) continue;
-
-                        var filePath = queryString["Path"];
+                        var paths = queryString["Path"]?.Split(',') ?? new string[0];
+                        var noErrorPaths = paths.Where(p => !p.StartsWith("__Error"));
+                        var filePath = noErrorPaths.FirstOrDefault();
                         if (filePath == null)
                         {
                             variables.Add(new Variable(variableName, JObject.FromObject(new { content = (string)null }), "FileInput"));
@@ -894,12 +897,11 @@ WHERE
                         }
 
                         FormData.SetZipFileParam(paramName, null);
-                        if (key.Split(',').Length > 1)
+                        if (noErrorPaths.Count() > 1)
                         {
                             //
                             // Zip file
                             //
-                            var paths = filePath.Split(',');
                             var names = queryString["Name"].Split(',');
                             FormData.SetZipFileParam(paramName, paramValue);
                             filePath = Path.Combine("zip", paramName, $"{paramName}.zip");
@@ -908,6 +910,7 @@ WHERE
                             {
                                 for (int i = 0; i < paths.Length; i++)
                                 {
+                                    if (paths[i].StartsWith("__Error")) continue;
                                     zipFile.CreateEntryFromFile(Path.Combine(StoragePath, paths[i]), names[i]);
                                 }
                             }
