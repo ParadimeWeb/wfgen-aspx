@@ -55,7 +55,7 @@
     <Reference Include="System.Xml" />
     <Reference Include="WindowsBase" />
     <Reference Include="WorkflowGen.My">
-      <HintPath>..\..\..\..\WorkflowGen\8.3.4\Inetpub\wwwroot\wfgen\bin\WorkflowGen.My.dll</HintPath>
+      <HintPath>C:\WorkflowGen\v8.3.4\Inetpub\wwwroot\wfgen\bin\WorkflowGen.My.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
