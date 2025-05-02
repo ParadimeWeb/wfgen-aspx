@@ -21,6 +21,7 @@ using ParadimeWeb.WorkflowGen.Data;
 using ParadimeWeb.WorkflowGen.Data.GraphQL;
 using Newtonsoft.Json.Linq;
 using System.IO.Compression;
+using System.Net;
 
 namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
 {
@@ -880,6 +881,14 @@ WHERE
                     var dataType = r.GetString(2);
                     var dataSetId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3);
                     var paramValue = FormData.GetParam(tableName, paramName, row);
+                    if (paramValue == null)
+                    {
+                        if (dataSetId.HasValue)
+                        {
+                            deleteDataset.Add(dataSetId.Value);
+                        }
+                        continue;
+                    }
 
                     if (dataType == "FILE")
                     {
@@ -891,8 +900,10 @@ WHERE
                         var filePath = noErrorPaths.FirstOrDefault();
                         if (filePath == null)
                         {
-                            variables.Add(new Variable(variableName, JObject.FromObject(new { content = (string)null }), "FileInput"));
-                            parameters.Add($"{{ name: \"{dataName}\", fileValue: ${variableName} }}");
+                            if (dataSetId.HasValue)
+                            {
+                                deleteDataset.Add(dataSetId.Value);
+                            }
                             continue;
                         }
 
@@ -935,18 +946,26 @@ WHERE
                     }
                     if (dataType == "NUMERIC")
                     {
-                        variables.Add(new Variable(variableName, paramValue == null ? null : JToken.FromObject(paramValue), "Float"));
+                        variables.Add(new Variable(variableName, JToken.FromObject(paramValue), "Float"));
                         parameters.Add($"{{ name: \"{dataName}\", numericValue: ${variableName} }}");
                         continue;
                     }
                     if (dataType == "DATETIME")
                     {
-                        variables.Add(new Variable(variableName, paramValue == null ? null : ((DateTime)paramValue).ToUniversalTime().ToString("O"), "DateTime"));
+                        variables.Add(new Variable(variableName, ((DateTime)paramValue).ToUniversalTime().ToString("O"), "DateTime"));
                         parameters.Add($"{{ name: \"{dataName}\", dateTimeValue: ${variableName} }}");
                         continue;
                     }
-                    variables.Add(new Variable(variableName, paramValue == null ? null : JToken.FromObject(paramValue), "String"));
+                    variables.Add(new Variable(variableName, JToken.FromObject(paramValue), "String"));
                     parameters.Add($"{{ name: \"{dataName}\", textValue: ${variableName} }}");
+                }
+                r.Close();
+
+                if (deleteDataset.Count > 0)
+                {
+                    cmd.CommandText = $"DELETE FROM [WFDATASET_VALUE] WHERE [ID_DATASET] IN ({string.Join(", ", deleteDataset)})";
+                    cmd.Parameters.Clear();
+                    cmd.ExecuteNonQuery();
                 }
             }
 
@@ -995,7 +1014,7 @@ WHERE
     parameters: [{string.Join(", ", parameters)}] 
 }}) {{ clientMutationId }}";
 
-            Client.CreateClient(Client.DefaultUrl);
+            Client.CreateClient(Client.DefaultUrl, new NetworkCredential(ConfigurationManager.AppSettings["MyGraphQLUsername"], ConfigurationManager.AppSettings["MyGraphQLPassword"]));
             try
             {
                 Client.Mutation(query, variables.ToArray());
