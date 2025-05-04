@@ -31,6 +31,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Advantys.Security">
+      <HintPath>C:\WorkflowGen\v8.3.4\Inetpub\wwwroot\wfgen\bin\Advantys.Security.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
@@ -43,6 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Modules\Auth.cs" />
     <Compile Include="Modules\Cookies.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
