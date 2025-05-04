@@ -14,6 +14,7 @@ namespace ParadimeWeb.WorkflowGen.WebServer.Modules
 
         public void Init(HttpApplication application)
         {
+            application.BeginRequest += Context_BeginRequest;
             application.AuthenticateRequest += new EventHandler(AuthenticateRequest);
         }
 
@@ -32,6 +33,33 @@ namespace ParadimeWeb.WorkflowGen.WebServer.Modules
             {
                 var wfgModule = new JWTAuthenticationModule();
                 wfgModule.AuthenticateRequest(source, eventArgs);
+            }
+        }
+
+        private void Context_BeginRequest(object sender, EventArgs e)
+        {
+            var application = (HttpApplication)sender;
+            var context = application.Context;
+            var delegatorCookiename = "WFGEN_ID_USER_DELEGATOR";
+            var ID_USER_DELEGATOR = context.Request.Form["ID_USER_DELEGATOR"] ?? "-1";
+            var delegatorCookie = context.Request.Cookies[delegatorCookiename];
+            if (delegatorCookie == null || delegatorCookie.Value != ID_USER_DELEGATOR)
+            {
+                if (delegatorCookie == null)
+                {
+                    context.Response.Cookies.Add(new HttpCookie(delegatorCookiename, ID_USER_DELEGATOR)
+                    {
+                        HttpOnly = true,
+                        SameSite = SameSiteMode.Lax
+                    });
+                }
+                else
+                {
+                    delegatorCookie.Value = ID_USER_DELEGATOR;
+                    delegatorCookie.HttpOnly = true;
+                    delegatorCookie.SameSite = SameSiteMode.Lax;
+                    context.Response.Cookies.Set(delegatorCookie);
+                }
             }
         }
     }
