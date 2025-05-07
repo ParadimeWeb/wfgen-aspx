@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Configuration;
+using System.IO;
 using System.Security.Principal;
 using System.Text;
 using System.Web;
@@ -21,6 +23,42 @@ namespace ParadimeWeb.WorkflowGen.WebServer.Modules
             application.AuthenticateRequest += new EventHandler(authenticateRequest);
         }
 
+        private bool skipAuthentication(HttpApplication webApplication)
+        {
+            if (string.IsNullOrEmpty(webApplication.Request.Headers["authorization"]) && ConfigurationManager.AppSettings["GraphqlApiKeyEnabled"] == "Y" && webApplication.Request.Headers["x-wfgen-graphql-api-key"] == ConfigurationManager.AppSettings["GraphqlApiKey"] && (webApplication.Request.RawUrl.EndsWith("/graphql", StringComparison.InvariantCultureIgnoreCase) || webApplication.Request.RawUrl.EndsWith("/graphql?", StringComparison.InvariantCultureIgnoreCase) || webApplication.Request.RawUrl.EndsWith("/graphql/schema", StringComparison.InvariantCultureIgnoreCase)))
+            {
+                return true;
+            }
+            var absolutePath = webApplication.Request.Url.AbsolutePath;
+            var anonPages = new List<string>()
+            {
+              "forgotpassword.aspx",
+              "login.aspx"
+            };
+            foreach (string str in anonPages)
+            {
+                if (absolutePath.EndsWith(str, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            if (!Path.HasExtension(absolutePath))
+            {
+                return false;
+            }
+            return new List<string>()
+            {
+              ".js",
+              ".css",
+              ".png",
+              ".htm",
+              ".gif",
+              ".ico",
+              ".jpg",
+              ".svg"
+            }.Contains(Path.GetExtension(absolutePath));
+        }
+
         private void authenticateRequest(object source, EventArgs e)
         {
             var webApplication = (HttpApplication)source;
@@ -29,14 +67,21 @@ namespace ParadimeWeb.WorkflowGen.WebServer.Modules
                 webApplication.Request.Headers.Add("IsWebhook", "Y");
                 return;
             }
-            if (webApplication.Request.Url.AbsoluteUri.Contains("/wfgen/login.aspx"))
-            {
-                return;
-            }
             if (webApplication.Request.Cookies["wfgen_auth_type"]?.Value == "SSO")
             {
                 var jwtModule = new JWTAuthenticationModule();
                 jwtModule.AuthenticateRequest(source, e);
+                return;
+            }
+            if (skipAuthentication(webApplication))
+            {
+                return;
+            }
+            var absolutePath = webApplication.Request.Url.AbsolutePath;
+            if (absolutePath.EndsWith("/graphql/dist/server.js", StringComparison.InvariantCultureIgnoreCase))
+            {
+                var authModule = new AuthenticationModule();
+                authModule.AuthenticateRequest(source, e);
                 return;
             }
             var sessionToken = webApplication.Request.Cookies[SessionTokenCookie]?.Value;

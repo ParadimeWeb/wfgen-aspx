@@ -355,7 +355,7 @@ WHERE
                     var error = new Exception($"WorkflowGen is out of context. The files no longer exist at path {StoragePath}");
                     if (IsAsyncRequest)
                     {
-                        //Elmah.ErrorSignal.FromCurrentContext().Raise(error);
+                        Elmah.ErrorSignal.FromCurrentContext().Raise(error);
                         runAction(() =>
                         {
                             Response.StatusCode = 500;
@@ -389,7 +389,7 @@ WHERE
                                 var error = new Exception($"WorkflowGen is out of context. The files are dirty at path {StoragePath}");
                                 if (IsAsyncRequest)
                                 {
-                                    //Elmah.ErrorSignal.FromCurrentContext().Raise(error);
+                                    Elmah.ErrorSignal.FromCurrentContext().Raise(error);
                                     runAction(() =>
                                     {
                                         Response.StatusCode = 500;
@@ -917,7 +917,7 @@ WHERE
                             FormData.SetZipFileParam(paramName, paramValue);
                             filePath = Path.Combine("zip", paramName, $"{paramName}.zip");
                             Directory.CreateDirectory(Path.Combine(StoragePath, "zip", paramName));
-                            using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, filePath), ZipArchiveMode.Create))
+                            using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, filePath), ZipArchiveMode.Create)) // TODO: if the file already exists, it throws error.
                             {
                                 for (int i = 0; i < paths.Length; i++)
                                 {
