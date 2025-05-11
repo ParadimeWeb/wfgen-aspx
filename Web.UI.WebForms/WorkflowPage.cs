@@ -907,6 +907,7 @@ WHERE
                             continue;
                         }
 
+                        var fileSysPath = Path.Combine(StoragePath, filePath);
                         FormData.SetZipFileParam(paramName, null);
                         if (noErrorPaths.Count() > 1)
                         {
@@ -917,7 +918,11 @@ WHERE
                             FormData.SetZipFileParam(paramName, paramValue);
                             filePath = Path.Combine("zip", paramName, $"{paramName}.zip");
                             Directory.CreateDirectory(Path.Combine(StoragePath, "zip", paramName));
-                            using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, filePath), ZipArchiveMode.Create)) // TODO: if the file already exists, it throws error.
+                            if (File.Exists(fileSysPath))
+                            {
+                                File.Delete(fileSysPath);
+                            }
+                            using (var zipFile = ZipFile.Open(fileSysPath, ZipArchiveMode.Create))
                             {
                                 for (int i = 0; i < paths.Length; i++)
                                 {
@@ -929,7 +934,7 @@ WHERE
                         FormData.SetParam(paramName, filePath);
 
                         var fileName = Path.GetFileName(filePath);
-                        using (var fs = new FileStream(Path.Combine(StoragePath, filePath), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        using (var fs = new FileStream(fileSysPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                         {
                             var uri = new Uri(fs.Name);
                             variables.Add(new Variable(variableName, JObject.FromObject(new
