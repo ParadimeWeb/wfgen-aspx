@@ -427,6 +427,7 @@ WHERE
                             { "ASYNC_UPLOAD", OnAsyncUpload },
                             { "ASYNC_SAVE", OnAsyncSave },
                             { "ASYNC_SUBMIT", OnAsyncSubmit },
+                            { "ASYNC_MISSING_KEY", OnAsyncMissingTranslation },
                             { "ASYNC_ThrowException", (action, ctx) => throw new Exception("Runtime error in an AJAX call") },
                             { "ASYNC_GetLocalProcessParticipantUsers", OnAsyncGetLocalProcessParticipantUsers },
                             { "ASYNC_GetUsers", OnAsyncGetUsers },
@@ -1089,6 +1090,41 @@ WHERE
                     string.IsNullOrEmpty(Request["ps"]) ? 20 : Convert.ToInt32(Request["ps"]));
             }
             Response.Write(JsonConvert.SerializeObject(result));
+        }
+        protected virtual void OnAsyncMissingTranslation(string action, ContextParameters ctx) 
+        {
+            Request.Files["MissingTranslation"].SaveAs(Server.MapPath("~/i18n/en/translation_missing.json"));
+            //var key = Request["key"];
+            //var enDir = Directory.CreateDirectory(Server.MapPath("~/i18n/en"));
+            //File.AppendAllText(Path.Combine(enDir.FullName, "translation_missing.json"), key);
+            //using (var file = File.OpenWrite(Path.Combine(enDir.FullName, "translation_missing.json")))
+            //using (var streamReader = new StreamReader(file))
+            //using (var jsonReader = new JsonTextReader(streamReader))
+            //{
+            //    var json = JToken.ReadFrom(jsonReader);
+            //    json.Append(new JProperty(key, key));
+            //    using (var streamWriter = new StreamWriter(file))
+            //    using (var writer = new JsonTextWriter(streamWriter))
+            //    {
+            //        writer.Formatting = Formatting.Indented;
+            //        json.WriteTo(writer);
+            //    }
+            //}
+            //var frDir = Directory.CreateDirectory(Server.MapPath("~/i18n/fr"));
+            //using (var file = File.OpenWrite(Path.Combine(frDir.FullName, "translation_missing.json")))
+            //using (var streamReader = new StreamReader(file))
+            //using (var jsonReader = new JsonTextReader(streamReader))
+            //{
+            //    var json = JToken.ReadFrom(jsonReader);
+            //    json.Append(new JProperty(key, key));
+            //    using (var streamWriter = new StreamWriter(file))
+            //    using (var writer = new JsonTextWriter(streamWriter))
+            //    {
+            //        writer.Formatting = Formatting.Indented;
+            //        json.WriteTo(writer);
+            //    }
+            //}
+            Response.Write(JsonConvert.SerializeObject(new { Result = "OK" }));
         }
         private void runAction(Action<string, ContextParameters> run, string action = null, ContextParameters ctx = null)
         {
