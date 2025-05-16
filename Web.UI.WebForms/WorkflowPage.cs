@@ -1031,7 +1031,7 @@ WHERE
             }
             
 
-            Response.Write("{ \"result\": \"Success\" }");
+            Response.Write("{ \"replyTo\": \"Success\" }");
         }
         protected virtual void OnAsyncGetLocalProcessParticipantUsers(string action, ContextParameters ctx) =>
             Response.Write(JsonConvert.SerializeObject(Request["pid"] != null ?
@@ -1093,8 +1093,16 @@ WHERE
         }
         protected virtual void OnAsyncMissingTranslation(string action, ContextParameters ctx) 
         {
-            Request.Files["MissingTranslation"].SaveAs(Server.MapPath("~/i18n/en/translation_missing.json"));
-            Request.Files["MissingTranslation"].SaveAs(Server.MapPath("~/i18n/fr/translation_missing.json"));
+            using (var streamReader = new StreamReader(Request.Files["MissingTranslation"].InputStream))
+            {
+                var filePath = Server.MapPath("~/i18n/en/translation_missing.json");
+                var json1 = JObject.Parse(streamReader.ReadToEnd());
+                var json2 = JObject.Parse(File.ReadAllText(filePath));
+
+                json1.Merge(json2, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Union });
+                File.WriteAllText(filePath, json1.ToString());
+            }
+
             Response.Write(JsonConvert.SerializeObject(new { Result = "OK" }));
         }
         private void runAction(Action<string, ContextParameters> run, string action = null, ContextParameters ctx = null)
