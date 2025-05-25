@@ -493,10 +493,7 @@ WHERE
         {
             return new KeyValuePair<string, Type>[0];
         }
-        protected virtual string[] OnFormDataInit()
-        {
-            return new string[0];
-        }
+        protected virtual void OnFormDataInit() { }
         protected virtual void OnWebhooks(Dictionary<string, Action<string>> hooks) { }
         protected virtual void OnAsyncActions(Dictionary<string, Action<string, ContextParameters>> actions) { }
         private List<string> setArchiveCommands(string _commands)
@@ -661,35 +658,15 @@ GROUP BY
                 FormData.SetParam(fileParam.Name, queryString.ToString());
             }
 
-            var gridViewTables = OnFormDataInit();
+            OnFormDataInit();
 
-            var omitTables = new string[] {
-                TableNames.Table1,
-                TableNames.Configuration,
-                TableNames.Comments,
-                TableNames.CurrentUser,
-                TableNames.Assignee,
-                TableNames.Approvals
-            };
-            foreach (DataTable table in FormData.Tables)
-            {
-                if (omitTables.Contains(table.TableName)) continue;
-                if (gridViewTables.Contains(table.TableName))
-                {
-                    for (int i = 0; i < table.Rows.Count; i++)
-                    {
-                        allFields.AddRange(table.Columns.OfType<DataColumn>().Select(c => $"{table.TableName}.{i}.{c.ColumnName}"));
-                    }
-                    continue;
-                }
-                allFields.Add(table.TableName);
-            }
-            allFields.Add("COMMENTS");
+            allFields.Add("SUBMIT_COMMENTS");
+            allFields.Add("CANCEL_COMMENTS");
             allFields.Add("APPROVE_COMMENTS");
             allFields.Add("REJECT_COMMENTS");
             var separator = new char[] { ',', ';' };
             FormData.SetRequiredFields(string.Join(",", filterFields(allFields, FormData.RequiredFields().Split(separator, StringSplitOptions.RemoveEmptyEntries))));
- 
+
             FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
         }
         protected virtual void OnAsyncInit(string action, ContextParameters ctx)
