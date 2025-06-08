@@ -105,6 +105,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             ds.CreateColumn<string>(Table1Column.MoreCommands);
             ds.CreateColumn<string>(Table1Column.RequiredFields);
             ds.CreateColumn<string>(Table1Column.ReadonlyFields);
+            ds.CreateColumn<string>(Table1Column.ApprovalRole);
         }
         public static DataTable Table1(this System.Data.DataSet ds) => ds.Tables[TableNames.Table1];
         public static DataTable Comments(this System.Data.DataSet ds) => ds.Tables[TableNames.Comments];

@@ -427,6 +427,8 @@ WHERE
                             { "ASYNC_UPLOAD", OnAsyncUpload },
                             { "ASYNC_SAVE", OnAsyncSave },
                             { "ASYNC_SUBMIT", OnAsyncSubmit },
+                            { "ASYNC_APPROVE", OnAsyncSubmit },
+                            { "ASYNC_REJECT", OnAsyncSubmit },
                             { "ASYNC_MISSING_KEY", OnAsyncMissingTranslation },
                             { "ASYNC_ThrowException", (action, ctx) => throw new Exception("Runtime error in an AJAX call") },
                             { "ASYNC_GetLocalProcessParticipantUsers", OnAsyncGetLocalProcessParticipantUsers },
@@ -660,12 +662,29 @@ GROUP BY
 
             OnFormDataInit();
 
+            var omitTables = new string[] {
+                TableNames.Table1,
+                TableNames.Configuration,
+                TableNames.Comments,
+                TableNames.CurrentUser,
+                TableNames.Assignee,
+                TableNames.Approvals,
+                TableNames.ZipFiles
+            };
+            foreach (DataTable table in FormData.Tables)
+            {
+                if (omitTables.Contains(table.TableName)) continue;
+                allFields.Add(table.TableName);
+            }
+
+            allFields.Add("COMMENTS");
             allFields.Add("SUBMIT_COMMENTS");
             allFields.Add("CANCEL_COMMENTS");
             allFields.Add("APPROVE_COMMENTS");
             allFields.Add("REJECT_COMMENTS");
             var separator = new char[] { ',', ';' };
             FormData.SetRequiredFields(string.Join(",", filterFields(allFields, FormData.RequiredFields().Split(separator, StringSplitOptions.RemoveEmptyEntries))));
+            FormData.SetReadonlyFields(string.Join(",", filterFields(allFields, FormData.ReadonlyFields().Split(separator, StringSplitOptions.RemoveEmptyEntries))));
 
             FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
         }
@@ -717,7 +736,8 @@ GROUP BY
                 FormData.SetParam(fileParam.Name, filePath);
             }
 
-            FormData.SetFormAction(action.Remove(0, 6));
+            action = action.Remove(0, 6);
+            FormData.SetFormAction(action);
             FormData.SetFormArchiveFileName("form_archive.htm");
 
             OnPreSubmit(action);
@@ -750,11 +770,21 @@ GROUP BY
         {
             if (Request.Files.Count < 1)
             {
-                return new { Error = "No file" };
+                return new { Path = "__Error__NoFile" };
             }
             var field = Request.Form["field"];
             var Key = Request.Form["key"];
             var file = Request.Files[0];
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var fileNameInvalidChars = invalidChars.Where(ic => file.FileName.Contains(ic)).ToArray();
+            if (fileNameInvalidChars.Length > 0)
+            {
+                return new 
+                { 
+                    Path = $"__Error__InvalidChars__{string.Join(", ", fileNameInvalidChars)}",
+                    Name = file.FileName
+                };
+            }
             var uploadPath = Path.Combine(StoragePath, "upload", field);
             var fileName = Path.GetFileName(file.FileName);
             var filePath = Path.Combine(uploadPath, fileName);
@@ -762,7 +792,7 @@ GROUP BY
             {
                 return new
                 {
-                    Error = "File name, {{name}}, is too long. Try renaming it.",
+                    Path = $"__Error__TooLong__{filePath.Length - 260}",
                     Name = fileName
                 };
             }
