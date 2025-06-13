@@ -209,6 +209,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
         protected override void OnPreLoad(EventArgs e)
         {
             base.OnPreLoad(e);
+
             AbsoluteUrl = Request.Url.GetLeftPart(UriPartial.Path);
             AbsoluteBaseUrl = AbsoluteUrl.Remove(AbsoluteUrl.LastIndexOf(Request.Url.Segments.Last()));
             IsWebhook = Request.Headers["IsWebhook"] == "Y";
@@ -226,7 +227,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
                 return;
             }
             IsAsyncRequest = Request.Headers["X-Requested-With"] == "XMLHttpRequest";
-            wfgenAction = Request.Form["__WFGENACTION"];
+            wfgenAction = Request["__WFGENACTION"];
             AuthenticatedUser = Utils.GetPaddedUsername(User.Identity.Name);
             delegatorCookie = Request.Cookies["WFGEN_ID_USER_DELEGATOR"];
 
@@ -234,9 +235,9 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             {
                 IsFormArchive = true;
                 var appUrl = ConfigurationManager.AppSettings["ApplicationUrl"];
-                var processInstId = Convert.ToInt32(Request.Form["ID_PROCESS_INST"]);
-                var activityInstId = Convert.ToInt32(Request.Form["ID_ACTIVITY_INST"]);
-                var delegatorId = Request.Form["ID_USER_DELEGATOR"];
+                var processInstId = Convert.ToInt32(Request["ID_PROCESS_INST"]);
+                var activityInstId = Convert.ToInt32(Request["ID_ACTIVITY_INST"]);
+                var delegatorId = Request["ID_USER_DELEGATOR"];
                 using (var comm = DbCtx.Connection.CreateCommand())
                 {
                     DbCtx.EnsureConnectionIsOpen();

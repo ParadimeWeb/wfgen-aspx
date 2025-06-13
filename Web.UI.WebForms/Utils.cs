@@ -43,12 +43,13 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             var htmlDocument = new HtmlDocument();
             htmlDocument.LoadHtml(File.ReadAllText(htmlPath));
 
-            var rootDiv = htmlDocument.DocumentNode.SelectSingleNode("//div");
             var htmlBody = htmlDocument.DocumentNode.SelectSingleNode("//body");
+            var scriptTag = htmlBody.SelectSingleNode("script");
+            var rootDiv = htmlBody.SelectSingleNode("div");
             htmlBody.RemoveAllChildren();
 
             var form = htmlDocument.CreateElement("form");
-            form.SetAttributeValue("method", "post");
+            form.SetAttributeValue("method", "get");
             form.SetAttributeValue("action", absoluteUrl);
 
             var __WFGENACTION = htmlDocument.CreateElement("input");
@@ -81,6 +82,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             form.AppendChild(ID_USER_DELEGATOR);
             htmlBody.AppendChild(form);
             htmlBody.AppendChild(rootDiv);
+            htmlBody.AppendChild(scriptTag);
 
             return htmlDocument;
         }
