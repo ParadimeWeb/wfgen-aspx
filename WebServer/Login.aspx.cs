@@ -24,7 +24,7 @@ namespace ParadimeWeb.WorkflowGen.WebServer
 
             if (Page.IsPostBack && IsAsyncRequest) 
             {
-                var QUERY = Request["QUERY"];
+                var QUERY = Request.Form["QUERY"];
                 Response.ClearContent();
                 Response.Clear();
                 Response.Expires = 0;
@@ -37,57 +37,49 @@ namespace ParadimeWeb.WorkflowGen.WebServer
 
                 if (QUERY == "LOGIN")
                 {
-                    var username = Request["username"];
-                    var password = Request["password"];
+                    var username = Request.Form["username"];
+                    var password = Request.Form["password"];
                     var MainDbSource = ConfigurationManager.ConnectionStrings["MainDbSource"];
+                    var removeDomainPrefix = ConfigurationManager.AppSettings["ApplicationSecurityRemoveDomainPrefix"].Split(',').GetEnumerator();
+                    int maxLoginAttempts;
+                    if (!int.TryParse(ConfigurationManager.AppSettings["ApplicationSecurityMaxLoginAttempts"], out maxLoginAttempts))
+                        maxLoginAttempts = 5;
+                    var applicationSecurityPasswordManagementMode = "V5";
+                    if (!string.IsNullOrEmpty(ConfigurationManager.AppSettings["ApplicationSecurityPasswordManagementMode"]))
+                        applicationSecurityPasswordManagementMode = ConfigurationManager.AppSettings["ApplicationSecurityPasswordManagementMode"];
                     var ID_USER = -1;
-                    var ID_DIRECTORY = -1;
                     var AUTH = "N";
 
                     using (var conn = new SqlConnection(MainDbSource.ConnectionString))
                     using (var cmd = conn.CreateCommand())
                     {
                         conn.Open();
-                        cmd.CommandText = "SELECT ID_USER, ID_DIRECTORY FROM USERS WHERE USERNAME = @USERNAME";
+                        cmd.CommandText = "SELECT USERS.ID_USER, DIRECTORY.AUTH FROM USERS, DIRECTORY WHERE USERS.ID_DIRECTORY=DIRECTORY.ID_DIRECTORY AND USERS.USERNAME=@USERNAME";
                         cmd.Parameters.AddWithValue("@USERNAME", username);
                         var reader = cmd.ExecuteReader();
-                        if (reader.Read()) 
+                        if (reader.Read())
                         {
                             ID_USER = reader.GetInt32(0);
-                            ID_DIRECTORY = reader.GetInt32(1);
-                        }
-                        reader.Close();
-                        cmd.Parameters.Clear();
-
-                        if (ID_DIRECTORY > 0)
-                        {
-                            cmd.CommandText = "SELECT AUTH FROM DIRECTORY WHERE ID_DIRECTORY = @DIRECTORY_ID";
-                            cmd.Parameters.AddWithValue("@DIRECTORY_ID", ID_DIRECTORY);
-                            reader = cmd.ExecuteReader();
-                            if (reader.Read())
-                            {
-                                AUTH = reader.GetString(0);
-                            }
-                            reader.Close();
-                            cmd.Parameters.Clear();
+                            AUTH = reader.GetString(1);
                         }
                     }
 
-                    if (AUTH == "Y")
+                    if (ID_USER < 0)
                     {
-                        var removeDomainPrefix = ConfigurationManager.AppSettings["ApplicationSecurityRemoveDomainPrefix"].Split(',').GetEnumerator();
-                        int maxLoginAttempts;
-                        if (!int.TryParse(ConfigurationManager.AppSettings["ApplicationSecurityMaxLoginAttempts"], out maxLoginAttempts))
-                            maxLoginAttempts = 5;
-                        var applicationSecurityPasswordManagementMode = "V5";
-                        if (!string.IsNullOrEmpty(ConfigurationManager.AppSettings["ApplicationSecurityPasswordManagementMode"]))
-                            applicationSecurityPasswordManagementMode = ConfigurationManager.AppSettings["ApplicationSecurityPasswordManagementMode"];
+                        error = "NOT_FOUND";
+                    }
+                    else if (AUTH == "Y")
+                    {
                         try
                         {
                             new UserIdentity(MainDbSource.ProviderName, MainDbSource.ConnectionString, removeDomainPrefix).Authenticate(username, password, maxLoginAttempts, applicationSecurityPasswordManagementMode);
                             var token = JWT.Encode(username, SessionTokenSigningSecret, JwsAlgorithm.HS256);
                             Response.Cookies.Add(new HttpCookie(SessionTokenCookie, token) { HttpOnly = true, SameSite = SameSiteMode.Lax });
                             Response.Cookies.Add(new HttpCookie("wfgen_auth_type", "WFGEN") { HttpOnly = true, SameSite = SameSiteMode.Lax });
+                        }
+                        catch (MaxLoginAttemptsReachedException)
+                        {
+                            error = "MAX_ATTEMPTS";
                         }
                         catch
                         {
@@ -98,8 +90,6 @@ namespace ParadimeWeb.WorkflowGen.WebServer
                     {
                         error = "NO_AUTH";
                     }
-
-                    
                 }
                 else if (QUERY == "SSO")
                 {

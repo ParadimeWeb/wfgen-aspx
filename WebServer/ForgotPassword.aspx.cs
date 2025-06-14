@@ -15,14 +15,20 @@ namespace ParadimeWeb.WorkflowGen.WebServer
         private static readonly string MainDbSourceConnStr = ConfigurationManager.ConnectionStrings["MainDbSource"].ConnectionString;
         private static readonly string ApplicationUrl = VirtualPathUtility.RemoveTrailingSlash(ConfigurationManager.AppSettings["ApplicationUrl"]);
 
-        private void resetPassword()
+        private string resetPassword()
         {
-            var PASSWORD = Request["PASSWORD"];
-            var USER_ID = Convert.ToInt32(Request["USER_ID"]);
-            var TOKEN = Request["TOKEN"];
+            var PASSWORD = Request.Form["PASSWORD"];
+            var USER_ID = Convert.ToInt32(Request.Form["USER_ID"]);
+            var TOKEN = Request.Form["TOKEN"];
             var dateTime = DateTime.MinValue;
             var utcNow = DateTime.UtcNow;
-            int ID_USER = -1;
+            var ID_USER = -1;
+            var ApplicationSecurityMinimumPasswordLength = Convert.ToInt32(ConfigurationManager.AppSettings["ApplicationSecurityMinimumPasswordLength"]);
+
+            if (PASSWORD.Length < ApplicationSecurityMinimumPasswordLength)
+            {
+                return "MIN_LENGTH";
+            }
 
             using (var conn = new SqlConnection(MainDbSourceConnStr)) 
             using (var cmd = conn.CreateCommand())
@@ -60,68 +66,57 @@ namespace ParadimeWeb.WorkflowGen.WebServer
                     cmd.Parameters.AddWithValue("@RESETPWD_TOKEN", DBNull.Value);
                     cmd.Parameters.AddWithValue("@RESETPWD_TIME", DBNull.Value);
                     cmd.Parameters.AddWithValue("@CONN_ATTEMPTS", 0);
+                    cmd.Parameters.AddWithValue("@ID_USER", ID_USER);
                     cmd.ExecuteNonQuery();
                 }
             }
+
+            return null;
         }
 
-        private bool sendRequestReset()
+        private string sendRequestReset()
         {
-            var RESET_EMAIL = Request["RESET_EMAIL"];
+            var RESET_EMAIL = Request.Form["RESET_EMAIL"];
             var utcNow = DateTime.UtcNow;
             var RESETPWD_TOKEN = Guid.NewGuid().ToString();
             var USERNAME = "";
+            var EMAIL = "";
             var FIRSTNAME = "";
             var LASTNAME = "";
+            var AUTH = "N";
+            var ID_USER = -1;
 
             using (var conn = new SqlConnection(MainDbSourceConnStr))
             using (var cmd = conn.CreateCommand())
             {
                 conn.Open();
-                var ID_USER = -1;
-                var ID_DIRECTORY = -1;
-                var AUTH = "N";
-                
-
-                cmd.CommandText = "SELECT ID_USER, USERNAME, FIRSTNAME, LASTNAME, ID_DIRECTORY FROM USERS WHERE EMAIL = @EMAIL";
+                cmd.CommandText = "SELECT USERS.ID_USER, USERS.EMAIL, USERS.USERNAME, USERS.FIRSTNAME, USERS.LASTNAME, DIRECTORY.AUTH FROM USERS, DIRECTORY WHERE USERS.ID_DIRECTORY=DIRECTORY.ID_DIRECTORY AND USERNAME=@EMAIL";
                 cmd.Parameters.AddWithValue("@EMAIL", RESET_EMAIL);
                 var reader = cmd.ExecuteReader();
                 if (reader.Read())
                 {
                     ID_USER = reader.GetInt32(0);
-                    USERNAME = reader.GetString(1);
-                    FIRSTNAME = reader.GetString(2);
-                    LASTNAME = reader.GetString(3);
-                    ID_DIRECTORY = reader.GetInt32(4);
+                    EMAIL = reader.GetString(1);
+                    USERNAME = reader.GetString(2);
+                    FIRSTNAME = reader.GetString(3);
+                    LASTNAME = reader.GetString(4);
+                    AUTH = reader.GetString(5);
+                }
+                if (ID_USER < 0)
+                {
+                    return "NOT_FOUND";
+                }
+                if (AUTH != "Y") 
+                {
+                    return "NO_AUTH";
                 }
                 reader.Close();
                 cmd.Parameters.Clear();
-
-                if (ID_DIRECTORY > 0) 
-                {
-                    cmd.CommandText = "SELECT AUTH FROM DIRECTORY WHERE ID_DIRECTORY = @DIRECTORY_ID";
-                    cmd.Parameters.AddWithValue("@DIRECTORY_ID", ID_DIRECTORY);
-                    reader = cmd.ExecuteReader();
-                    if (reader.Read()) 
-                    {
-                        AUTH = reader.GetString(0);
-                    }
-                    reader.Close();
-                    cmd.Parameters.Clear();
-                }
-                
-                if (AUTH == "Y")
-                {
-                    cmd.CommandText = "UPDATE USERS SET RESETPWD_TOKEN = @RESETPWD_TOKEN, RESETPWD_TIME = @RESETPWD_TIME WHERE ID_USER = @ID_USER";
-                    cmd.Parameters.AddWithValue("@RESETPWD_TOKEN", RESETPWD_TOKEN);
-                    cmd.Parameters.AddWithValue("@RESETPWD_TIME", utcNow);
-                    cmd.Parameters.AddWithValue("@ID_USER", ID_USER);
-                }
-            }
-
-            if (USERNAME == "")
-            {
-                return false;
+                cmd.CommandText = "UPDATE USERS SET RESETPWD_TOKEN = @RESETPWD_TOKEN, RESETPWD_TIME = @RESETPWD_TIME WHERE ID_USER = @ID_USER";
+                cmd.Parameters.AddWithValue("@RESETPWD_TOKEN", RESETPWD_TOKEN);
+                cmd.Parameters.AddWithValue("@RESETPWD_TIME", utcNow);
+                cmd.Parameters.AddWithValue("@ID_USER", ID_USER);
+                cmd.ExecuteNonQuery();
             }
 
             using (var smtp = new SmtpClient(ConfigurationManager.AppSettings["ApplicationSmtpServer"], Convert.ToInt32(ConfigurationManager.AppSettings["ApplicationSmtpPort"])))
@@ -131,29 +126,29 @@ namespace ParadimeWeb.WorkflowGen.WebServer
                 mailMessage.BodyEncoding = Encoding.UTF8;
                 mailMessage.SubjectEncoding = Encoding.UTF8;
                 mailMessage.IsBodyHtml = false;
-                mailMessage.To.Add(new MailAddress(RESET_EMAIL, $"{FIRSTNAME} {LASTNAME}"));
+                mailMessage.To.Add(new MailAddress(EMAIL, $"{FIRSTNAME} {LASTNAME}"));
                 mailMessage.Subject = "WorkflowGen password reset request";
                 mailMessage.Body = $@"Hello {FIRSTNAME} ({USERNAME}),
 
 We have received a request to reset your password. Click on the link below to reset your password:
 
-{ApplicationUrl}/forgotpassword.aspx?QUERY=RESET&TOKEN=53d872dd-f155-417d-a8d4-7da0e697d456
+{ApplicationUrl}/forgotpassword.aspx?QUERY=RESET&TOKEN={RESETPWD_TOKEN}
 
 If you did not request this password reset, contact your WorkflowGen administrator.";
                 smtp.Send(mailMessage);
             }
 
-            return true;
+            return null;
         }
 
         protected override void OnPreLoad(EventArgs e)
         {
             base.OnPreLoad(e);
-            var QUERY = Request["QUERY"];
             var IsAsyncRequest = Request.Headers["X-Requested-With"] == "XMLHttpRequest";
 
             if (Page.IsPostBack && IsAsyncRequest) 
             {
+                var QUERY = Request.Form["QUERY"];
                 Response.ClearContent();
                 Response.Clear();
                 Response.Expires = 0;
@@ -165,19 +160,16 @@ If you did not request this password reset, contact your WorkflowGen administrat
                 {
                     if (QUERY == "SEND_REQUEST_RESET")
                     {
-                        if (!sendRequestReset())
-                        {
-                            error = "NOT_EXIST";
-                        }
+                        error = sendRequestReset();
                     }
                     else if (QUERY == "CONFIRM_RESET")
                     {
-                        resetPassword();
+                        error = resetPassword();
                     }
                 }
-                catch 
+                catch (Exception ex)
                 {
-                    error = "SERVER_ERROR";
+                    error = ex.Message + ex.StackTrace; // "SERVER_ERROR";
                 }
 
                 Response.Write(JsonConvert.SerializeObject(new { query = QUERY, error }));
@@ -186,9 +178,9 @@ If you did not request this password reset, contact your WorkflowGen administrat
                 return;
             }
 
-            if (QUERY == "RESET")
+            if (Request.Params["QUERY"] == "RESET")
             {
-                var TOKEN = Request["TOKEN"];
+                var TOKEN = Request.Params["TOKEN"];
                 var ID_USER = -1;
                 var utcNow = DateTime.UtcNow;
                 var dateTime = DateTime.MinValue;
