@@ -5,6 +5,7 @@ using Advantys.Security;
 using Jose;
 using System.Web;
 using Newtonsoft.Json;
+using System.Data.SqlClient;
 
 namespace ParadimeWeb.WorkflowGen.WebServer
 {
@@ -14,7 +15,6 @@ namespace ParadimeWeb.WorkflowGen.WebServer
         private static readonly string SessionTokenCookie = !string.IsNullOrEmpty(ConfigurationManager.AppSettings["ApplicationSecurityAuthSessionTokenCookie"]) ? ConfigurationManager.AppSettings["ApplicationSecurityAuthSessionTokenCookie"] : "wfgen_token";
         private static readonly byte[] SessionTokenSigningSecret = Encoding.UTF8.GetBytes(ConfigurationManager.AppSettings["ApplicationSecurityAuthSessionTokenSigningSecret"]);
         private bool IsAsyncRequest;
-        private string wfgenAction;
 
         protected override void OnPreLoad(EventArgs e)
         {
@@ -24,7 +24,7 @@ namespace ParadimeWeb.WorkflowGen.WebServer
 
             if (Page.IsPostBack && IsAsyncRequest) 
             {
-                wfgenAction = Request["__WFGENACTION"];
+                var QUERY = Request["QUERY"];
                 Response.ClearContent();
                 Response.Clear();
                 Response.Expires = 0;
@@ -35,33 +35,73 @@ namespace ParadimeWeb.WorkflowGen.WebServer
                 var returnUrl = Request["ReturnUrl"] == null ? ApplicationUrl : Request["ReturnUrl"];
                 returnUrl = returnUrl.EndsWith("show.aspx?QUERY=CONTEXT&REQUEST_QUERY=WELCOME&NO_REDIR=Y") ? ApplicationUrl : returnUrl;
 
-                if (wfgenAction == "LOGIN")
+                if (QUERY == "LOGIN")
                 {
                     var username = Request["username"];
                     var password = Request["password"];
+                    var MainDbSource = ConfigurationManager.ConnectionStrings["MainDbSource"];
+                    var ID_USER = -1;
+                    var ID_DIRECTORY = -1;
+                    var AUTH = "N";
 
-                    var connectionString = ConfigurationManager.ConnectionStrings["MainDbSource"].ConnectionString;
-                    var providerName = ConfigurationManager.ConnectionStrings["MainDbSource"].ProviderName;
-                    var removeDomainPrefix = ConfigurationManager.AppSettings["ApplicationSecurityRemoveDomainPrefix"].Split(',').GetEnumerator();
-                    int maxLoginAttempts;
-                    if (!int.TryParse(ConfigurationManager.AppSettings["ApplicationSecurityMaxLoginAttempts"], out maxLoginAttempts))
-                        maxLoginAttempts = 5;
-                    var applicationSecurityPasswordManagementMode = "V5";
-                    if (!string.IsNullOrEmpty(ConfigurationManager.AppSettings["ApplicationSecurityPasswordManagementMode"]))
-                        applicationSecurityPasswordManagementMode = ConfigurationManager.AppSettings["ApplicationSecurityPasswordManagementMode"];
-                    try
+                    using (var conn = new SqlConnection(MainDbSource.ConnectionString))
+                    using (var cmd = conn.CreateCommand())
                     {
-                        new UserIdentity(providerName, connectionString, removeDomainPrefix).Authenticate(username, password, maxLoginAttempts, applicationSecurityPasswordManagementMode);
-                        var token = JWT.Encode(username, SessionTokenSigningSecret, JwsAlgorithm.HS256);
-                        Response.Cookies.Add(new HttpCookie(SessionTokenCookie, token) { HttpOnly = true, SameSite = SameSiteMode.Lax });
-                        Response.Cookies.Add(new HttpCookie("wfgen_auth_type", "WFGEN") { HttpOnly = true, SameSite = SameSiteMode.Lax });
+                        conn.Open();
+                        cmd.CommandText = "SELECT ID_USER, ID_DIRECTORY FROM USERS WHERE USERNAME = @USERNAME";
+                        cmd.Parameters.AddWithValue("@USERNAME", username);
+                        var reader = cmd.ExecuteReader();
+                        if (reader.Read()) 
+                        {
+                            ID_USER = reader.GetInt32(0);
+                            ID_DIRECTORY = reader.GetInt32(1);
+                        }
+                        reader.Close();
+                        cmd.Parameters.Clear();
+
+                        if (ID_DIRECTORY > 0)
+                        {
+                            cmd.CommandText = "SELECT AUTH FROM DIRECTORY WHERE ID_DIRECTORY = @DIRECTORY_ID";
+                            cmd.Parameters.AddWithValue("@DIRECTORY_ID", ID_DIRECTORY);
+                            reader = cmd.ExecuteReader();
+                            if (reader.Read())
+                            {
+                                AUTH = reader.GetString(0);
+                            }
+                            reader.Close();
+                            cmd.Parameters.Clear();
+                        }
                     }
-                    catch
+
+                    if (AUTH == "Y")
                     {
-                        error = "Invalid credentials";
+                        var removeDomainPrefix = ConfigurationManager.AppSettings["ApplicationSecurityRemoveDomainPrefix"].Split(',').GetEnumerator();
+                        int maxLoginAttempts;
+                        if (!int.TryParse(ConfigurationManager.AppSettings["ApplicationSecurityMaxLoginAttempts"], out maxLoginAttempts))
+                            maxLoginAttempts = 5;
+                        var applicationSecurityPasswordManagementMode = "V5";
+                        if (!string.IsNullOrEmpty(ConfigurationManager.AppSettings["ApplicationSecurityPasswordManagementMode"]))
+                            applicationSecurityPasswordManagementMode = ConfigurationManager.AppSettings["ApplicationSecurityPasswordManagementMode"];
+                        try
+                        {
+                            new UserIdentity(MainDbSource.ProviderName, MainDbSource.ConnectionString, removeDomainPrefix).Authenticate(username, password, maxLoginAttempts, applicationSecurityPasswordManagementMode);
+                            var token = JWT.Encode(username, SessionTokenSigningSecret, JwsAlgorithm.HS256);
+                            Response.Cookies.Add(new HttpCookie(SessionTokenCookie, token) { HttpOnly = true, SameSite = SameSiteMode.Lax });
+                            Response.Cookies.Add(new HttpCookie("wfgen_auth_type", "WFGEN") { HttpOnly = true, SameSite = SameSiteMode.Lax });
+                        }
+                        catch
+                        {
+                            error = "INVALID_CREDENTIALS";
+                        }
                     }
+                    else
+                    {
+                        error = "NO_AUTH";
+                    }
+
+                    
                 }
-                else if (wfgenAction == "SSO")
+                else if (QUERY == "SSO")
                 {
                     Response.Cookies.Add(new HttpCookie("wfgen_auth_type", "SSO") { HttpOnly = true, SameSite = SameSiteMode.Lax });
                 }
