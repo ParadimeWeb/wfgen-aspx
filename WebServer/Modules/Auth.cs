@@ -87,7 +87,7 @@ namespace ParadimeWeb.WorkflowGen.WebServer.Modules
             var sessionToken = webApplication.Request.Cookies[SessionTokenCookie]?.Value;
             if (string.IsNullOrEmpty(sessionToken))
             {
-                webApplication.Response.Redirect($"~/login.aspx?ReturnUrl={HttpUtility.UrlEncode(webApplication.Request.Url.PathAndQuery)}");
+                webApplication.Response.Redirect($"{Config.ApplicationUrl}/login.aspx?ReturnUrl={HttpUtility.UrlEncode(webApplication.Request.Url.PathAndQuery)}");
                 return;
             }
             var decodedToken = JWT.Decode(sessionToken, SessionTokenSigningSecret, JwsAlgorithm.HS256);

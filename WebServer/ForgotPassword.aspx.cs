@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Configuration;
 using System.Text;
-using System.Web;
 using Newtonsoft.Json;
 using System.Data.SqlClient;
 using Advantys.My.Security;
@@ -11,10 +9,6 @@ namespace ParadimeWeb.WorkflowGen.WebServer
 {
     public partial class ForgotPassword : System.Web.UI.Page
     {
-        private static readonly string ApplicationSecurityPasswordManagementMode = ConfigurationManager.AppSettings["ApplicationSecurityPasswordManagementMode"];
-        private static readonly string MainDbSourceConnStr = ConfigurationManager.ConnectionStrings["MainDbSource"].ConnectionString;
-        private static readonly string ApplicationUrl = VirtualPathUtility.RemoveTrailingSlash(ConfigurationManager.AppSettings["ApplicationUrl"]);
-
         private string resetPassword()
         {
             var PASSWORD = Request.Form["PASSWORD"];
@@ -23,14 +17,14 @@ namespace ParadimeWeb.WorkflowGen.WebServer
             var dateTime = DateTime.MinValue;
             var utcNow = DateTime.UtcNow;
             var ID_USER = -1;
-            var ApplicationSecurityMinimumPasswordLength = Convert.ToInt32(ConfigurationManager.AppSettings["ApplicationSecurityMinimumPasswordLength"]);
+            var ApplicationSecurityMinimumPasswordLength = Convert.ToInt32(Config.ApplicationSecurityMinimumPasswordLength);
 
             if (PASSWORD.Length < ApplicationSecurityMinimumPasswordLength)
             {
                 return "MIN_LENGTH";
             }
 
-            using (var conn = new SqlConnection(MainDbSourceConnStr)) 
+            using (var conn = new SqlConnection(Config.MainDbSource.ConnectionString)) 
             using (var cmd = conn.CreateCommand())
             {
                 conn.Open();
@@ -49,10 +43,10 @@ namespace ParadimeWeb.WorkflowGen.WebServer
                 {
                     string salt;
                     string encryptedValue;
-                    if (ApplicationSecurityPasswordManagementMode == "OWH" || ApplicationSecurityPasswordManagementMode == "OWH_FIPS")
+                    if (Config.ApplicationSecurityPasswordManagementMode == "OWH" || Config.ApplicationSecurityPasswordManagementMode == "OWH_FIPS")
                     {
                         salt = CryptographyHelper.CreateSalt32Bytes();
-                        encryptedValue = ApplicationSecurityPasswordManagementMode == "OWH" ? CryptographyHelper.EncryptSHA256(salt + PASSWORD) : CryptographyHelper.EncryptSHA256FIPS(salt + PASSWORD);
+                        encryptedValue = Config.ApplicationSecurityPasswordManagementMode == "OWH" ? CryptographyHelper.EncryptSHA256(salt + PASSWORD) : CryptographyHelper.EncryptSHA256FIPS(salt + PASSWORD);
                     }
                     else
                     {
@@ -86,7 +80,7 @@ namespace ParadimeWeb.WorkflowGen.WebServer
             var AUTH = "N";
             var ID_USER = -1;
 
-            using (var conn = new SqlConnection(MainDbSourceConnStr))
+            using (var conn = new SqlConnection(Config.MainDbSource.ConnectionString))
             using (var cmd = conn.CreateCommand())
             {
                 conn.Open();
@@ -119,10 +113,10 @@ namespace ParadimeWeb.WorkflowGen.WebServer
                 cmd.ExecuteNonQuery();
             }
 
-            using (var smtp = new SmtpClient(ConfigurationManager.AppSettings["ApplicationSmtpServer"], Convert.ToInt32(ConfigurationManager.AppSettings["ApplicationSmtpPort"])))
+            using (var smtp = new SmtpClient(Config.ApplicationSmtpServer, Convert.ToInt32(Config.ApplicationSmtpPort)))
             using (var mailMessage = new MailMessage())
             {
-                mailMessage.From = new MailAddress(ConfigurationManager.AppSettings["EngineNotificationDefaultSender"], ConfigurationManager.AppSettings["EngineNotificationDefaultSenderName"]);
+                mailMessage.From = new MailAddress(Config.EngineNotificationDefaultSender, Config.EngineNotificationDefaultSenderName);
                 mailMessage.BodyEncoding = Encoding.UTF8;
                 mailMessage.SubjectEncoding = Encoding.UTF8;
                 mailMessage.IsBodyHtml = false;
@@ -132,7 +126,7 @@ namespace ParadimeWeb.WorkflowGen.WebServer
 
 We have received a request to reset your password. Click on the link below to reset your password:
 
-{ApplicationUrl}/forgotpassword.aspx?QUERY=RESET&TOKEN={RESETPWD_TOKEN}
+{Config.ApplicationUrl}/forgotpassword.aspx?QUERY=RESET&TOKEN={RESETPWD_TOKEN}
 
 If you did not request this password reset, contact your WorkflowGen administrator.";
                 smtp.Send(mailMessage);
@@ -156,20 +150,13 @@ If you did not request this password reset, contact your WorkflowGen administrat
                 Response.ContentType = "application/json";
 
                 string error = null;
-                try
+                if (QUERY == "SEND_REQUEST_RESET")
                 {
-                    if (QUERY == "SEND_REQUEST_RESET")
-                    {
-                        error = sendRequestReset();
-                    }
-                    else if (QUERY == "CONFIRM_RESET")
-                    {
-                        error = resetPassword();
-                    }
+                    error = sendRequestReset();
                 }
-                catch (Exception ex)
+                else if (QUERY == "CONFIRM_RESET")
                 {
-                    error = ex.Message + ex.StackTrace; // "SERVER_ERROR";
+                    error = resetPassword();
                 }
 
                 Response.Write(JsonConvert.SerializeObject(new { query = QUERY, error }));
@@ -184,7 +171,7 @@ If you did not request this password reset, contact your WorkflowGen administrat
                 var ID_USER = -1;
                 var utcNow = DateTime.UtcNow;
                 var dateTime = DateTime.MinValue;
-                using (var conn = new SqlConnection(MainDbSourceConnStr))
+                using (var conn = new SqlConnection(Config.MainDbSource.ConnectionString))
                 using (var cmd = conn.CreateCommand())
                 {
                     conn.Open();
