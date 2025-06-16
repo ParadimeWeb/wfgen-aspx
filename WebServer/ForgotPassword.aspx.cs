@@ -84,7 +84,7 @@ namespace ParadimeWeb.WorkflowGen.WebServer
             using (var cmd = conn.CreateCommand())
             {
                 conn.Open();
-                cmd.CommandText = "SELECT USERS.ID_USER, USERS.EMAIL, USERS.USERNAME, USERS.FIRSTNAME, USERS.LASTNAME, DIRECTORY.AUTH FROM USERS, DIRECTORY WHERE USERS.ID_DIRECTORY=DIRECTORY.ID_DIRECTORY AND USERNAME=@EMAIL";
+                cmd.CommandText = "SELECT USERS.ID_USER, USERS.EMAIL, USERS.USERNAME, USERS.FIRSTNAME, USERS.LASTNAME, DIRECTORY.AUTH FROM USERS, DIRECTORY WHERE USERS.ID_DIRECTORY=DIRECTORY.ID_DIRECTORY AND USERNAME=@EMAIL AND EMAIL IS NOT NULL";
                 cmd.Parameters.AddWithValue("@EMAIL", RESET_EMAIL);
                 var reader = cmd.ExecuteReader();
                 if (reader.Read())
@@ -92,7 +92,7 @@ namespace ParadimeWeb.WorkflowGen.WebServer
                     ID_USER = reader.GetInt32(0);
                     EMAIL = reader.GetString(1);
                     USERNAME = reader.GetString(2);
-                    FIRSTNAME = reader.GetString(3);
+                    FIRSTNAME = reader.IsDBNull(3) ? "" : reader.GetString(3);
                     LASTNAME = reader.GetString(4);
                     AUTH = reader.GetString(5);
                 }
