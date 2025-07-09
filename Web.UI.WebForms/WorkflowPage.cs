@@ -92,6 +92,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
                         r[ApprovalColumn.ApproverEmail] =
                             r[ApprovalColumn.ApproverEmployeeNumber] =
                             r[ApprovalColumn.ApproverName] =
+                            r[ApprovalColumn.ApproverUserId] =
                             r[ApprovalColumn.ApproverUserName] = DBNull.Value;
 
                     }
@@ -102,6 +103,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
                             r[ApprovalColumn.ApprovedByEmail] =
                             r[ApprovalColumn.ApprovedByEmployeeNumber] =
                             r[ApprovalColumn.ApprovedByName] =
+                            r[ApprovalColumn.ApprovedByUserId] =
                             r[ApprovalColumn.ApprovedByUserName] = DBNull.Value;
 
                     }
@@ -122,11 +124,13 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
                 r.SetApprovalRow(
                     approval,
                     DateTime.Now,
+                    assignee.Id,
                     assignee.UserName,
                     assignee.EmployeeNumber,
                     assignee.Email,
                     assignee.CommonName,
                     assignee.Directory,
+                    currentUser.Id,
                     currentUser.UserName,
                     currentUser.EmployeeNumber,
                     currentUser.Email,
@@ -430,6 +434,7 @@ WHERE
                             { "ASYNC_SUBMIT", OnAsyncSubmit },
                             { "ASYNC_APPROVE", OnAsyncSubmit },
                             { "ASYNC_REJECT", OnAsyncSubmit },
+                            { "ASYNC_CANCEL", OnAsyncSubmit },
                             { "ASYNC_MISSING_KEY", OnAsyncMissingTranslation },
                             { "ASYNC_ThrowException", (action, ctx) => throw new Exception("Runtime error in an AJAX call") },
                             { "ASYNC_GetLocalProcessParticipantUsers", OnAsyncGetLocalProcessParticipantUsers },
@@ -481,6 +486,10 @@ WHERE
                     userTimeZoneInfo = CryptographyHelper.Decode(Request.Form["WFGEN_USER_TZ_INFO"], encryptionKey);
                     stateManager.Add("WFGEN_USER_TZ_INFO", userTimeZoneInfo);
                 }
+            }
+            else
+            {
+                ClientScript.RegisterHiddenField("__WFG_ERROR", "NO_CONTEXT");
             }
         }
         public override void Dispose()

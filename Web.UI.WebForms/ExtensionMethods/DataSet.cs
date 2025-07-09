@@ -111,6 +111,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
         public static DataTable Comments(this System.Data.DataSet ds) => ds.Tables[TableNames.Comments];
         public static string CommentType(this DataRow row) => (string)row[CommentColumn.Type];
         public static string CommentAuthor(this DataRow row) => (string)row[CommentColumn.Author];
+        public static int CommentUserId(this DataRow row) => (int)row[CommentColumn.UserId];
         public static string CommentUserName(this DataRow row) => (string)row[CommentColumn.UserName];
         public static DateTime CommentCreated(this DataRow row) => (DateTime)row[CommentColumn.Created];
         public static int CommentProcessInstanceId(this DataRow row) => (int)row[CommentColumn.ProcessInstanceId];
@@ -129,6 +130,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
                 table.Columns.Add(CommentColumn.Type, typeof(string));
                 table.Columns.Add(CommentColumn.Role, typeof(string));
                 table.Columns.Add(CommentColumn.Author, typeof(string));
+                table.Columns.Add(CommentColumn.UserId, typeof(int));
                 table.Columns.Add(CommentColumn.UserName, typeof(string));
                 table.Columns.Add(CommentColumn.Directory, typeof(string));
                 table.Columns.Add(new DataColumn(CommentColumn.Created, typeof(DateTime)) { DateTimeMode = DataSetDateTime.Utc });
@@ -304,11 +306,13 @@ WHERE
         public static string ApprovalRole(this DataRow row) => (string)row[ApprovalColumn.Role];
         public static int? ApprovalProcessInstId(this DataRow row) => row.IsNull(ApprovalColumn.ProcessInstId) ? (int?)null : (int)row[ApprovalColumn.ProcessInstId];
         public static int? ApprovalActivityInstId(this DataRow row) => row.IsNull(ApprovalColumn.ActivityInstId) ? (int?)null : (int)row[ApprovalColumn.ActivityInstId];
+        public static int? ApprovalApproverUserId(this DataRow row) => row.IsNull(ApprovalColumn.ApproverUserId) ? (int?)null : (int)row[ApprovalColumn.ApproverUserId];
         public static string ApprovalApproverUserName(this DataRow row) => row.IsNull(ApprovalColumn.ApproverUserName) ? null : (string)row[ApprovalColumn.ApproverUserName];
         public static string ApprovalApproverEmployeeNumber(this DataRow row) => row.IsNull(ApprovalColumn.ApproverEmployeeNumber) ? null : (string)row[ApprovalColumn.ApproverEmployeeNumber];
         public static string ApprovalApproverEmail(this DataRow row) => row.IsNull(ApprovalColumn.ApproverEmail) ? null : (string)row[ApprovalColumn.ApproverEmail];
         public static string ApprovalApproverName(this DataRow row) => row.IsNull(ApprovalColumn.ApproverName) ? null : (string)row[ApprovalColumn.ApproverName];
         public static string ApprovalApproverDirectory(this DataRow row) => row.IsNull(ApprovalColumn.ApproverDirectory) ? null : (string)row[ApprovalColumn.ApproverDirectory];
+        public static int? ApprovalApprovedByUserId(this DataRow row) => row.IsNull(ApprovalColumn.ApprovedByUserId) ? (int?)null : (int)row[ApprovalColumn.ApprovedByUserId];
         public static string ApprovalApprovedByUserName(this DataRow row) => row.IsNull(ApprovalColumn.ApprovedByUserName) ? null : (string)row[ApprovalColumn.ApprovedByUserName];
         public static string ApprovalApprovedByEmployeeNumber(this DataRow row) => row.IsNull(ApprovalColumn.ApprovedByEmployeeNumber) ? null : (string)row[ApprovalColumn.ApprovedByEmployeeNumber];
         public static string ApprovalApprovedByEmail(this DataRow row) => row.IsNull(ApprovalColumn.ApprovedByEmail) ? null : (string)row[ApprovalColumn.ApprovedByEmail];
@@ -330,11 +334,13 @@ WHERE
                 dt.Columns.Add(ApprovalColumn.ProcessInstId, typeof(int));
                 dt.Columns.Add(ApprovalColumn.ActivityInstId, typeof(int));
                 dt.Columns.Add(ApprovalColumn.Role, typeof(string));
+                dt.Columns.Add(ApprovalColumn.ApproverUserId, typeof(int));
                 dt.Columns.Add(ApprovalColumn.ApproverUserName, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApproverEmployeeNumber, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApproverEmail, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApproverName, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApproverDirectory, typeof(string));
+                dt.Columns.Add(ApprovalColumn.ApprovedByUserId, typeof(int));
                 dt.Columns.Add(ApprovalColumn.ApprovedByUserName, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApprovedByEmployeeNumber, typeof(string));
                 dt.Columns.Add(ApprovalColumn.ApprovedByEmail, typeof(string));
@@ -346,10 +352,10 @@ WHERE
             dt.PrimaryKey = new DataColumn[] { dt.Columns[ApprovalColumn.Role] };
             return dt;
         }
-        public static void AddApprovalRow(this DataTable dt, string role, ApprovalType approval, DateTime approved, string approverUserName, string approverEmployeeNumber, string approverEmail, string approverName, string approverDirectory, string approvedByUserName, string approvedByEmployeeNumber, string approvedByEmail, string approvedByName, string approvedByDirectory, int processInstId, int activityInstId)
+        public static void AddApprovalRow(this DataTable dt, string role, ApprovalType approval, DateTime approved, int approverUserId, string approverUserName, string approverEmployeeNumber, string approverEmail, string approverName, string approverDirectory, int approvedByUserId, string approvedByUserName, string approvedByEmployeeNumber, string approvedByEmail, string approvedByName, string approvedByDirectory, int processInstId, int activityInstId)
         {
             var r = dt.AddApprovalRow(role);
-            r.SetApprovalRow(approval, approved, approverUserName, approverEmployeeNumber, approverEmail, approverName, approverDirectory, approvedByUserName, approvedByEmployeeNumber, approvedByEmail, approvedByName, approvedByDirectory, processInstId, activityInstId);
+            r.SetApprovalRow(approval, approved, approverUserId, approverUserName, approverEmployeeNumber, approverEmail, approverName, approverDirectory, approvedByUserId, approvedByUserName, approvedByEmployeeNumber, approvedByEmail, approvedByName, approvedByDirectory, processInstId, activityInstId);
         }
         public static DataRow AddApprovalRow(this DataTable dt, string role, bool needed = true)
         {
@@ -370,17 +376,19 @@ WHERE
             }
             return r;
         }
-        public static void SetApprovalRow(this DataRow r, ApprovalType approval, DateTime approved, string approverUserName, string approverEmployeeNumber, string approverEmail, string approverName, string approverDirectory, string approvedByUserName, string approvedByEmployeeNumber, string approvedByEmail, string approvedByName, string approvedByDirectory, int processInstId, int activityInstId, bool setApproverOnlyIfNull = false)
+        public static void SetApprovalRow(this DataRow r, ApprovalType approval, DateTime approved, int approverUserId, string approverUserName, string approverEmployeeNumber, string approverEmail, string approverName, string approverDirectory, int approvedByUserId, string approvedByUserName, string approvedByEmployeeNumber, string approvedByEmail, string approvedByName, string approvedByDirectory, int processInstId, int activityInstId, bool setApproverOnlyIfNull = false)
         {
             r[ApprovalColumn.Approval] = approval == ApprovalType.Rejected ? Model.Approval.Rejected : Model.Approval.Approved;
             r[ApprovalColumn.ProcessInstId] = processInstId;
             r[ApprovalColumn.ActivityInstId] = activityInstId;
             r[ApprovalColumn.Approved] = approved;
+            r.SetParam(ApprovalColumn.ApproverUserId, approverUserId, setApproverOnlyIfNull);
             r.SetParam(ApprovalColumn.ApproverUserName, approverUserName, setApproverOnlyIfNull);
             r.SetParam(ApprovalColumn.ApproverEmployeeNumber, approverEmployeeNumber, setApproverOnlyIfNull);
             r.SetParam(ApprovalColumn.ApproverEmail, approverEmail, setApproverOnlyIfNull);
             r.SetParam(ApprovalColumn.ApproverName, approverName, setApproverOnlyIfNull);
             r.SetParam(ApprovalColumn.ApproverDirectory, approverDirectory, setApproverOnlyIfNull);
+            r[ApprovalColumn.ApprovedByUserId] = approvedByUserId;
             r[ApprovalColumn.ApprovedByUserName] = approvedByUserName;
             r[ApprovalColumn.ApprovedByEmployeeNumber] = approvedByEmployeeNumber;
             r[ApprovalColumn.ApprovedByEmail] = approvedByEmail;
@@ -393,11 +401,13 @@ WHERE
             r[ApprovalColumn.ProcessInstId] =
             r[ApprovalColumn.ActivityInstId] =
             r[ApprovalColumn.Approved] =
+            r[ApprovalColumn.ApproverUserId] =
             r[ApprovalColumn.ApproverUserName] =
             r[ApprovalColumn.ApproverEmployeeNumber] =
             r[ApprovalColumn.ApproverEmail] =
             r[ApprovalColumn.ApproverName] =
             r[ApprovalColumn.ApproverDirectory] =
+            r[ApprovalColumn.ApprovedByUserId] =
             r[ApprovalColumn.ApprovedByUserName] =
             r[ApprovalColumn.ApprovedByEmployeeNumber] =
             r[ApprovalColumn.ApprovedByEmail] =
@@ -410,13 +420,14 @@ WHERE
             user.Set(newRow);
             dt.Rows.Add(newRow);
         }
-        public static void AddCommentRow(this System.Data.DataSet ds, string type, string role, string author, string userName, string directory, DateTime created, int processInstanceId, string processName, int activityInstanceId, string activityName, string comment)
+        public static void AddCommentRow(this System.Data.DataSet ds, string type, string role, string author, int userId, string userName, string directory, DateTime created, int processInstanceId, string processName, int activityInstanceId, string activityName, string comment)
         {
             var dt = ds.Tables[TableNames.Comments];
             var newRow = dt.NewRow();
             newRow[CommentColumn.Type] = type;
             newRow[CommentColumn.Role] = role == null ? DBNull.Value : (object)role;
             newRow[CommentColumn.Author] = author;
+            newRow[CommentColumn.UserId] = userId;
             newRow[CommentColumn.UserName] = userName;
             newRow[CommentColumn.Directory] = directory;
             newRow[CommentColumn.Created] = created;

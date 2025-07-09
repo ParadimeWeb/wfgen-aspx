@@ -11,6 +11,7 @@
         public const string Type = "Type";
         public const string Role = "Role";
         public const string Author = "Author";
+        public const string UserId = "UserId";
         public const string UserName = "UserName";
         public const string Directory = "Directory";
         public const string Created = "Created";
