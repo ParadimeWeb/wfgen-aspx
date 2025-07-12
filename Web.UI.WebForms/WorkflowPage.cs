@@ -731,7 +731,12 @@ GROUP BY
                     FormData.SetZipFileParam(fileParam.Name, fieldVal);
                     var zipFileFieldValue = Path.Combine("zip", fileParam.Name, $"{fileParam.Name}.zip");
                     Directory.CreateDirectory(Path.Combine(StoragePath, "zip", fileParam.Name));
-                    using (var zipFile = ZipFile.Open(Path.Combine(StoragePath, zipFileFieldValue), ZipArchiveMode.Create))
+                    var zipFilePath = Path.Combine(StoragePath, zipFileFieldValue);
+                    if (File.Exists(zipFilePath))
+                    {
+                        File.Delete(zipFilePath);
+                    }
+                    using (var zipFile = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
                     {
                         var names = queryString["Name"].Split(',');
                         for (int i = 0; i < paths.Length; i++)
@@ -935,6 +940,7 @@ WHERE
                             var names = queryString["Name"].Split(',');
                             FormData.SetZipFileParam(paramName, paramValue);
                             filePath = Path.Combine("zip", paramName, $"{paramName}.zip");
+                            fileSysPath = Path.Combine(StoragePath, filePath);
                             Directory.CreateDirectory(Path.Combine(StoragePath, "zip", paramName));
                             if (File.Exists(fileSysPath))
                             {
