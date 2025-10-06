@@ -340,6 +340,7 @@ WHERE
             string userTimeZone;
             string userTimeZoneInfo;
             var applicationDataPath = ConfigurationManager.AppSettings["ApplicationDataPath"];
+            var webAppsSecureMode = ConfigurationManager.AppSettings["ApplicationSecurityEnableWebAppsSecureMode"] == "Y";
             var encryptionKey = ConfigurationManager.AppSettings["ApplicationSecurityEncryptionKey"];
             var stateManager = new StateManager(false, ViewState);
 
@@ -462,11 +463,29 @@ WHERE
 
             if (!string.IsNullOrEmpty(Request.Form["WFGEN_REPLY_TO"]) && !string.IsNullOrEmpty(Request.Form["WFGEN_STORAGE_PATH"]) && !string.IsNullOrEmpty(Request.Form["WFGEN_INSTANCE_PATH"]))
             {
-                instancePath = CryptographyHelper.Decode(Request.Form["WFGEN_INSTANCE_PATH"], encryptionKey);
+                if (webAppsSecureMode)
+                {
+                    if (!string.IsNullOrEmpty(encryptionKey)) 
+                    {
+                        instancePath = CryptographyHelper.DecryptAes256CbcHkdfHmac(Request.Form["WFGEN_INSTANCE_PATH"], encryptionKey);
+                        StoragePath = CryptographyHelper.DecryptAes256CbcHkdfHmac(Request.Form["WFGEN_STORAGE_PATH"], encryptionKey);
+                        replyToUrl = CryptographyHelper.DecryptAes256CbcHkdfHmac(Request.Form["WFGEN_REPLY_TO"], encryptionKey);
+                    }
+                    else
+                    {
+                        instancePath = CryptographyHelper.DecodeBase64(Request.Form["WFGEN_INSTANCE_PATH"]);
+                        StoragePath = CryptographyHelper.DecodeBase64(Request.Form["WFGEN_STORAGE_PATH"]);
+                        replyToUrl = CryptographyHelper.DecodeBase64(Request.Form["WFGEN_REPLY_TO"]);
+                    }
+                }
+                else
+                {
+                    instancePath = Request.Form["WFGEN_INSTANCE_PATH"];
+                    StoragePath = Request.Form["WFGEN_STORAGE_PATH"];
+                    replyToUrl = Request.Form["WFGEN_REPLY_TO"];
+                }
                 stateManager.Add("WFGEN_INSTANCE_PATH", instancePath);
-                StoragePath = CryptographyHelper.Decode(Request.Form["WFGEN_STORAGE_PATH"], encryptionKey);
                 stateManager.Add("WFGEN_STORAGE_PATH", StoragePath);
-                replyToUrl = CryptographyHelper.Decode(Request.Form["WFGEN_REPLY_TO"], encryptionKey);
                 stateManager.Add("WFGEN_REPLY_TO", replyToUrl);
 
                 if (!string.IsNullOrEmpty(Request.Form["WFGEN_USER_TZ"]))
@@ -483,7 +502,14 @@ WHERE
                 }
                 if (!string.IsNullOrEmpty(Request.Form["WFGEN_USER_TZ_INFO"]))
                 {
-                    userTimeZoneInfo = CryptographyHelper.Decode(Request.Form["WFGEN_USER_TZ_INFO"], encryptionKey);
+                    if (webAppsSecureMode)
+                    {
+                        userTimeZoneInfo = !string.IsNullOrEmpty(encryptionKey) ? CryptographyHelper.DecryptAes256CbcHkdfHmac(Request.Form["WFGEN_USER_TZ_INFO"], encryptionKey) : CryptographyHelper.DecodeBase64(Request.Form["WFGEN_USER_TZ_INFO"]);
+                    }
+                    else
+                    {
+                        userTimeZoneInfo = Request.Form["WFGEN_USER_TZ_INFO"];
+                    }
                     stateManager.Add("WFGEN_USER_TZ_INFO", userTimeZoneInfo);
                 }
             }
