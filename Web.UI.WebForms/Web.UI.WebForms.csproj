@@ -54,9 +54,9 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
     <Reference Include="WindowsBase" />
-    <Reference Include="WorkflowGen.My, Version=9.2.11.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="WorkflowGen.My, Version=9.3.1.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\WorkflowGen\v9.3.1\Inetpub\wwwroot\wfgen\bin\WorkflowGen.My.dll</HintPath>
+      <HintPath>C:\WorkflowGen\v9.3.2\Inetpub\wwwroot\wfgen\bin\WorkflowGen.My.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

@@ -31,18 +31,21 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Advantys.My">
-      <HintPath>C:\WorkflowGen\v9.3.1\Inetpub\wwwroot\wfgen\bin\Advantys.My.dll</HintPath>
+    <Reference Include="Advantys.My, Version=9.3.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\WorkflowGen\v9.3.2\Inetpub\wwwroot\wfgen\bin\Advantys.My.dll</HintPath>
     </Reference>
-    <Reference Include="Advantys.Security">
-      <HintPath>C:\WorkflowGen\v9.3.1\Inetpub\wwwroot\wfgen\bin\Advantys.Security.dll</HintPath>
+    <Reference Include="Advantys.Security, Version=9.3.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\WorkflowGen\v9.3.2\Inetpub\wwwroot\wfgen\bin\Advantys.Security.dll</HintPath>
     </Reference>
-    <Reference Include="jose-jwt">
-      <HintPath>C:\WorkflowGen\v9.3.1\Inetpub\wwwroot\wfgen\bin\jose-jwt.dll</HintPath>
+    <Reference Include="jose-jwt, Version=3.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\WorkflowGen\v9.3.2\Inetpub\wwwroot\wfgen\bin\jose-jwt.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\WorkflowGen\v9.3.1\Inetpub\wwwroot\wfgen\bin\Newtonsoft.Json.dll</HintPath>
+      <HintPath>C:\WorkflowGen\v9.3.2\Inetpub\wwwroot\wfgen\bin\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
