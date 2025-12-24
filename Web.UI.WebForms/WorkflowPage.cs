@@ -49,34 +49,34 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
             IsFormArchive = false;
             DbCtx = new DataBaseContext();
         }
-        protected void AddApproval(string role, bool needed = true)
+        protected void AddApproval(string role, bool disabled = false)
         {
             using (var dt = FormData.CreateApprovalsTable())
             {
-                dt.AddApprovalRow(role, needed);
+                dt.AddApprovalRow(role, disabled);
             }
         }
-        protected void SetApprovalNeeded(string role, bool needed, bool reset = true)
+        protected void SetApprovalDisabled(string role, bool disabled, bool reset = true)
         {
             using (var dt = FormData.CreateApprovalsTable())
             {
                 var r = dt.Rows.Find(role);
                 if (reset)
                 {
-                    r.ResetApprovalRow(needed ? Approval.Pending : Approval.NotNeeded);
+                    r.ResetApprovalRow(disabled ? Approval.Disabled : Approval.Pending);
                 }
                 else
                 {
-                    if (needed)
+                    if (disabled)
                     {
-                        if (r.IsNull(ApprovalColumn.Approval) || (string)r[ApprovalColumn.Approval] == Approval.NotNeeded)
-                        {
-                            r[ApprovalColumn.Approval] = Approval.Pending;
-                        }
+                        r[ApprovalColumn.Approval] = Approval.Disabled;
                     }
                     else
                     {
-                        r[ApprovalColumn.Approval] = Approval.NotNeeded;
+                        if (r.IsNull(ApprovalColumn.Approval) || (string)r[ApprovalColumn.Approval] == Approval.Disabled)
+                        {
+                            r[ApprovalColumn.Approval] = Approval.Pending;
+                        }
                     }
                 }
             }
@@ -107,7 +107,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
                             r[ApprovalColumn.ApprovedByUserName] = DBNull.Value;
 
                     }
-                    if (r.IsNull(ApprovalColumn.Approval) || (string)r[ApprovalColumn.Approval] != Approval.NotNeeded)
+                    if (r.IsNull(ApprovalColumn.Approval) || (string)r[ApprovalColumn.Approval] != Approval.Disabled)
                     {
                         r[ApprovalColumn.Approval] = Approval.Pending;
                     }
@@ -152,17 +152,21 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
                 {
                     string tableName = table.Name;
                     var dt = FormData.Tables[tableName];
-                    dt.Rows.Clear();
+                    var rowIndex = 0;
                     foreach (var row in table.Value)
                     {
-                        var newRow = dt.NewRow();
+                        var newRow = dt.Rows.Count > rowIndex ? dt.Rows[rowIndex] : dt.NewRow();
                         foreach (var prop in row)
                         {
                             string column = prop.Name;
                             object value = prop.Value.Value;
                             newRow.SetParam(column, value);
                         }
-                        dt.Rows.Add(newRow);
+                        if (dt.Rows.Count <= rowIndex)
+                        {
+                            dt.Rows.Add(newRow);
+                        }
+                        rowIndex++;
                     }
                 }
             }
@@ -724,9 +728,11 @@ GROUP BY
 
             FormData.WriteXml(instancePath, XmlWriteMode.WriteSchema);
         }
+        protected virtual void OnPreGetInitData() { }
         protected virtual void OnAsyncInit(string action, ContextParameters ctx)
         {
             OnPreAsyncInit(action, ctx);
+            OnPreGetInitData();
             Response.Write(FormData.GetInitData(LangId, UserTimeZoneInfo));
         }
         protected virtual void OnPreSubmit(string action) {}

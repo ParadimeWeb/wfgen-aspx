@@ -41,6 +41,8 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
         public static void SetFormArchiveFileName(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.FormArchive, value);
         public static string FormAction(this System.Data.DataSet ds) => (string)ds.GetParam(Table1Column.FormAction);
         public static void SetFormAction(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.FormAction, value);
+        public static string ApprovalRole(this System.Data.DataSet ds) => (string)ds.GetParam(Table1Column.ApprovalRole);
+        public static void SetApprovalRole(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.ApprovalRole, value);
         public static string Commands(this System.Data.DataSet ds) => (string)ds.GetParam(Table1Column.Commands);
         public static void SetCommands(this System.Data.DataSet ds, string value) => ds.SetParam(Table1Column.Commands, value);
         public static string FarCommands(this System.Data.DataSet ds) => (string)ds.GetParam(Table1Column.FarCommands);
@@ -357,7 +359,7 @@ WHERE
             var r = dt.AddApprovalRow(role);
             r.SetApprovalRow(approval, approved, approverUserId, approverUserName, approverEmployeeNumber, approverEmail, approverName, approverDirectory, approvedByUserId, approvedByUserName, approvedByEmployeeNumber, approvedByEmail, approvedByName, approvedByDirectory, processInstId, activityInstId);
         }
-        public static DataRow AddApprovalRow(this DataTable dt, string role, bool needed = true)
+        public static DataRow AddApprovalRow(this DataTable dt, string role, bool disabled = false)
         {
             DataRow r;
             if (dt.Rows.Contains(role))
@@ -368,9 +370,9 @@ WHERE
             {
                 r = dt.NewRow();
                 r[ApprovalColumn.Role] = role;
-                if (!needed)
+                if (disabled)
                 {
-                    r[ApprovalColumn.Approval] = Model.Approval.NotNeeded;
+                    r[ApprovalColumn.Approval] = Model.Approval.Disabled;
                 }
                 dt.Rows.Add(r);
             }

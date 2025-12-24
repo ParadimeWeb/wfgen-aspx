@@ -171,10 +171,6 @@ namespace ParadimeWeb.WorkflowGen.Data.GraphQL
                         throw new Exception($"Status: {response.StatusCode}, request Url: {request.RequestUri}");
                     }
                     result = JsonConvert.DeserializeObject(response.Content.ReadAsStringAsync().Result);
-                    //if (result.errors != null)
-                    //{
-                    //    throw new Exception((string)result.errors[0].message);
-                    //}
                 }
             }
             return result;
