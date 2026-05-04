@@ -26,7 +26,6 @@ namespace ParadimeWeb.WorkflowGen.WebServer
 
                 string error = null;
                 var returnUrl = Request["ReturnUrl"] == null ? Config.ApplicationUrl : Request["ReturnUrl"];
-                returnUrl = returnUrl.EndsWith("show.aspx?QUERY=CONTEXT&REQUEST_QUERY=WELCOME&NO_REDIR=Y") ? Config.ApplicationUrl : returnUrl;
 
                 if (QUERY == "LOGIN")
                 {
