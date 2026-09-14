@@ -30,7 +30,7 @@ namespace ParadimeWeb.WorkflowGen.Web.UI.WebForms
         private string wfgenAction;
         private string replyToUrl;
         private string instancePath;
-        private HttpCookie delegatorCookie;
+        protected HttpCookie delegatorCookie;
         protected DataBaseContext DbCtx {  get; private set; }
         protected bool IsAsyncRequest { get; private set; }
         protected bool IsWebhook { get; private set; }

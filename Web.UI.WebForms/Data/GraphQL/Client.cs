@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ParadimeWeb.WorkflowGen.Web.UI.WebForms;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -10,6 +11,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Web;
+using WorkflowGen.My.HtmlAgilityPack;
 
 namespace ParadimeWeb.WorkflowGen.Data.GraphQL
 {
@@ -176,43 +178,70 @@ namespace ParadimeWeb.WorkflowGen.Data.GraphQL
             return result;
         }
         public static dynamic Mutation(string query, string impersonateUsername = null) => Mutation(query, null, impersonateUsername);
-        public static void UpdateFormData(int processInstId, DataSet formData, string formDataName = "FORM_DATA")
+        public static void UpdateFormData(int processInstId, System.Data.DataSet formData, string formDataName = "FORM_DATA")
         {
-            byte[] formDataBytes;
-            using (var stream = new MemoryStream())
+            var formDataPath = Path.Combine(ConfigurationManager.AppSettings["ApplicationDataPath"], @"Files\GraphQL", $"{Guid.NewGuid()}.xml");
+            formData.WriteXml(formDataPath, XmlWriteMode.WriteSchema);
+            var variables = new List<Variable>();
+            using (var fs = new FileStream(formDataPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                formData.WriteXml(stream, XmlWriteMode.WriteSchema);
-                formDataBytes = stream.ToArray();
+                var uri = new Uri(fs.Name);
+                variables.Add(new Variable(formDataName, JObject.FromObject(new
+                {
+                    name = "dataOut.xml",
+                    contentType = "application/xml",
+                    size = fs.Length,
+                    updatedAt = DateTime.UtcNow.ToString("O"),
+                    url = uri.AbsoluteUri
+                }), "FileInput"));
             }
-            Mutation(
-                @"updateRequestDataset(input: { 
-    number: " + processInstId + @", 
-    parameters: [{ name: """ + formDataName + @""", fileValue: { upload: $formData } }] 
-}) { clientMutationId }",
-                new MultipartFileUpload[] {
-                    new MultipartFileUpload("formData", "dataOUT.xml", "application/xml", formDataBytes)
-                });
+            var query = $@"updateRequestDataset(input: {{ 
+    number: {processInstId}, 
+    parameters: [{{ name: ""{formDataName}"", fileValue: ${formDataName} }}] 
+}}) {{ clientMutationId }}";
+            Mutation(query, variables.ToArray());
         }
-        public static void UpdateFormData(int processInstId, DataSet formData, byte[] formArchive, string formDataName = "FORM_DATA", string formArchiveName = "FORM_ARCHIVE")
+        public static void UpdateFormData(int processInstId, System.Data.DataSet formData, HtmlDocument formArchive, string formDataName = "FORM_DATA", string formArchiveName = "FORM_ARCHIVE")
         {
-            byte[] formDataBytes;
-            using (var stream = new MemoryStream())
+            var formDataPath = Path.Combine(ConfigurationManager.AppSettings["ApplicationDataPath"], @"Files\GraphQL", $"{Guid.NewGuid()}.xml");
+            formData.WriteXml(formDataPath, XmlWriteMode.WriteSchema);
+            var parameters = new List<string>();
+            var variables = new List<Variable>();
+            using (var fs = new FileStream(formDataPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                formData.WriteXml(stream, XmlWriteMode.WriteSchema);
-                formDataBytes = stream.ToArray();
+                var uri = new Uri(fs.Name);
+                variables.Add(new Variable(formDataName, JObject.FromObject(new
+                {
+                    name = "dataOut.xml",
+                    contentType = "application/xml",
+                    size = fs.Length,
+                    updatedAt = DateTime.UtcNow.ToString("O"),
+                    url = uri.AbsoluteUri
+                }), "FileInput"));
+                parameters.Add($"{{ name: \"{formDataName}\", fileValue: ${formDataName} }}");
             }
-            Mutation(
-                @"updateRequestDataset(input: { 
-    number: " + processInstId + @", 
-    parameters: [
-        { name: """ + formDataName + @""", fileValue: { upload: $formData } },
-        { name: """ + formArchiveName + @""", fileValue: { upload: $formArchive } }
-    ] 
-}) { clientMutationId }",
-                new MultipartFileUpload[] {
-                    new MultipartFileUpload("formData", "dataOUT.xml", "application/xml", formDataBytes),
-                    new MultipartFileUpload("formArchive", "form_archive.htm", "text/html", formArchive)
-                });
+
+            var formArchivePath = Path.Combine(ConfigurationManager.AppSettings["ApplicationDataPath"], @"Files\GraphQL", $"{Guid.NewGuid()}.html");
+            formArchive.Save(formArchivePath, Encoding.UTF8);
+            using (var fs = new FileStream(formArchivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                var uri = new Uri(fs.Name);
+                variables.Add(new Variable(formArchiveName, JObject.FromObject(new
+                {
+                    name = formData.FormArchiveFileName(),
+                    contentType = "text/html",
+                    size = fs.Length,
+                    updatedAt = DateTime.UtcNow.ToString("O"),
+                    url = uri.AbsoluteUri
+                }), "FileInput"));
+                parameters.Add($"{{ name: \"{formArchiveName}\", fileValue: ${formArchiveName} }}");
+            }
+
+            var query = $@"updateRequestDataset(input: {{ 
+    number: {processInstId}, 
+    parameters: [{string.Join(", ", parameters)}] 
+}}) {{ clientMutationId }}";
+            Mutation(query, variables.ToArray());
         }
     }
 }
