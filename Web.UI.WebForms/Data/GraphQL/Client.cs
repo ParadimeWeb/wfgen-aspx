@@ -200,6 +200,12 @@ namespace ParadimeWeb.WorkflowGen.Data.GraphQL
     parameters: [{{ name: ""{formDataName}"", fileValue: ${formDataName} }}] 
 }}) {{ clientMutationId }}";
             Mutation(query, variables.ToArray());
+
+            try
+            {
+                File.Delete(formDataPath);
+            }
+            catch { }
         }
         public static void UpdateFormData(int processInstId, System.Data.DataSet formData, HtmlDocument formArchive, string formDataName = "FORM_DATA", string formArchiveName = "FORM_ARCHIVE")
         {
@@ -242,6 +248,17 @@ namespace ParadimeWeb.WorkflowGen.Data.GraphQL
     parameters: [{string.Join(", ", parameters)}] 
 }}) {{ clientMutationId }}";
             Mutation(query, variables.ToArray());
+
+            try
+            {
+                File.Delete(formDataPath);
+            }
+            catch { }
+            try
+            {
+                File.Delete(formArchivePath);
+            }
+            catch { }
         }
     }
 }
