@@ -67,7 +67,8 @@ namespace ParadimeWeb.WorkflowGen.WebServer.Modules
                 webApplication.Request.Headers.Add("IsWebhook", "Y");
                 return;
             }
-            if (webApplication.Request.Cookies["wfgen_auth_type"]?.Value == "SSO")
+            var absolutePath = webApplication.Request.Url.AbsolutePath;
+            if (absolutePath.Contains("/mcp/oauth") || webApplication.Request.Cookies["wfgen_auth_type"]?.Value == "SSO")
             {
                 var jwtModule = new JWTAuthenticationModule();
                 jwtModule.AuthenticateRequest(source, e);
@@ -77,7 +78,6 @@ namespace ParadimeWeb.WorkflowGen.WebServer.Modules
             {
                 return;
             }
-            var absolutePath = webApplication.Request.Url.AbsolutePath;
             if (absolutePath.EndsWith("/graphql/dist/server.js", StringComparison.InvariantCultureIgnoreCase))
             {
                 var authModule = new AuthenticationModule();
