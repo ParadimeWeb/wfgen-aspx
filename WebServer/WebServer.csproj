@@ -31,21 +31,24 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="0Harmony, Version=2.4.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\Lib.Harmony.2.4.3\lib\net48\0Harmony.dll</HintPath>
+    </Reference>
     <Reference Include="Advantys.My, Version=9.4.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\WorkflowGen\v9.6.0\Inetpub\wwwroot\wfgen\bin\Advantys.My.dll</HintPath>
+      <HintPath>C:\WorkflowGen\v10.5.0\Inetpub\wwwroot\wfgen\bin\Advantys.My.dll</HintPath>
     </Reference>
     <Reference Include="Advantys.Security, Version=9.4.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\WorkflowGen\v9.6.0\Inetpub\wwwroot\wfgen\bin\Advantys.Security.dll</HintPath>
+      <HintPath>C:\WorkflowGen\v10.5.0\Inetpub\wwwroot\wfgen\bin\Advantys.Security.dll</HintPath>
     </Reference>
     <Reference Include="jose-jwt, Version=3.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\WorkflowGen\v9.6.0\Inetpub\wwwroot\wfgen\bin\jose-jwt.dll</HintPath>
+      <HintPath>C:\WorkflowGen\v10.5.0\Inetpub\wwwroot\wfgen\bin\jose-jwt.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\WorkflowGen\v9.3.2\Inetpub\wwwroot\wfgen\bin\Newtonsoft.Json.dll</HintPath>
+      <HintPath>C:\WorkflowGen\v10.5.0\Inetpub\wwwroot\wfgen\bin\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -63,12 +66,16 @@
     <Compile Include="ForgotPassword.aspx.cs">
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
+    <Compile Include="HarmonyBootstrap.cs" />
+    <Compile Include="JwtAuthPatch.cs" />
     <Compile Include="Login.aspx.cs">
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
     <Compile Include="Modules\Auth.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
