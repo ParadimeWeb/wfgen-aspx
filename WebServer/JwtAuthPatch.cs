@@ -101,7 +101,7 @@ namespace ParadimeWeb.WorkflowGen.WebServer
                 return;
             }
             var absolutePath = webApplication.Request.Url.AbsolutePath;
-            if (absolutePath.Contains("/mcp/oauth") || webApplication.Request.Cookies["wfgen_auth_type"]?.Value == "SSO")
+            if (webApplication.Request.Cookies["wfgen_auth_type"]?.Value == "SSO")
             {
                 var jwtModule = new JWTAuthenticationModule();
                 jwtModule.AuthenticateRequest(source, e);
